@@ -59,6 +59,8 @@ static const int nCoinbaseMaturityADJ = 500;            // 500 blocks
 inline bool MoneyRange(int64 nValue) { return (nValue >= 0 && nValue <= MAX_MONEY); }
 // Threshold for nLockTime: below this value it is interpreted as block number, otherwise as UNIX timestamp.
 static const unsigned int LOCKTIME_THRESHOLD = 500000000; // Tue Nov  5 00:53:20 1985 UTC
+// Maximum number of script-checking threads allowed
+static const int MAX_SCRIPTCHECK_THREADS = 16;
 
 inline bool IsMiningProofOfWork(int nHeight)
 {
@@ -193,6 +195,9 @@ extern std::map<uint256, CBlock*> mapOrphanBlocks;
 // Settings
 extern int64 nTransactionFee;
 extern int64 nMinimumInputValue;
+extern bool fUseFastIndex;
+extern unsigned int nDerivationMethodIndex;
+extern int nScriptCheckThreads;
 
 // Minimum disk space required - used in CheckDiskSpace()
 static const uint64 nMinDiskSpace = 52428800;
@@ -201,6 +206,7 @@ static const uint64 nMinDiskSpace = 52428800;
 class CReserveKey;
 class CTxDB;
 class CTxIndex;
+class CScriptCheck;
 
 void RegisterWallet(CWallet* pwalletIn);
 void UnregisterWallet(CWallet* pwalletIn);
@@ -220,6 +226,11 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake=false);
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce);
 void FormatHashBuffers(CBlock* pblock, char* pmidstate, char* pdata, char* phash1);
 bool CheckWork(CBlock* pblock, CWallet& wallet, CReserveKey& reservekey);
+// Run an instance of the script checking thread
+void ThreadScriptCheck(void* parg);
+// Stop the script checking threads
+void ThreadScriptCheckQuit();
+
 bool CheckProofOfWork(uint256 hash, unsigned int nBits);
 int64 GetProofOfWorkReward(int nBits, int nHeight, int64 nFees);
 int64 GetProofOfWorkRewardV2(const CBlockIndex* pindexPrev, int64 nFees, bool fLastBlock);
