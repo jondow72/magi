@@ -127,16 +127,12 @@ contains(BITCOIN_NEED_QT_PLUGINS, 1) {
     DEFINES += HAVE_BUILD_INFO
 }
 
-# If we have an ARM device, we can't use SSE2 instructions, so don't try to use them
-QMAKE_XCPUARCH = $$QMAKE_HOST.arch
-equals(QMAKE_XCPUARCH, armv7l) {
-    message(Building without SSE2 support)
-}
-else:equals(QMAKE_XCPUARCH, armv6l) {
-    message(Building without SSE2 support)
+# If we have an arm device, we can't use sse2, so define as thumb
+# Otherwise, assume sse2 exists
+!equals($$QMAKE_HOST.arch, armv7l) {
+    message(FOUND host = $$QMAKE_HOST.arch)
 }
 else {
-    message(Building with SSE2 support)
     QMAKE_CXXFLAGS += -msse2
     QMAKE_CFLAGS += -msse2
 }
@@ -202,7 +198,6 @@ HEADERS += src/qt/bitcoingui.h \
     src/qt/transactiondesc.h \
     src/qt/transactiondescdialog.h \
     src/qt/bitcoinamountfield.h \
-    src/qt/updatecheck.h \
     src/wallet.h \
     src/keystore.h \
     src/qt/transactionfilterproxy.h \
@@ -273,7 +268,6 @@ SOURCES += src/qt/bitcoin.cpp src/qt/bitcoingui.cpp \
     src/qt/transactiondescdialog.cpp \
     src/qt/bitcoinstrings.cpp \
     src/qt/bitcoinamountfield.cpp \
-    src/qt/updatecheck.cpp \
     src/wallet.cpp \
     src/keystore.cpp \
     src/qt/transactionfilterproxy.cpp \
