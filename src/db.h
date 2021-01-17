@@ -5,8 +5,6 @@
 #ifndef BITCOIN_DB_H
 #define BITCOIN_DB_H
 
-#include "fs.h"
-
 #include "main.h"
 
 #include <map>
