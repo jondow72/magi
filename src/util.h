@@ -5,6 +5,8 @@
 #ifndef MAGI_UTIL_H
 #define MAGI_UTIL_H
 
+#include "fs.h"
+
 #include "uint256.h"
 
 #ifndef WIN32
