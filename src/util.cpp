@@ -227,7 +227,7 @@ inline int OutputDebugStringF(const char* pszFormat, ...)
 
         if (!fileout)
         {
-            boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+            fs::path pathDebug = GetDataDir() / "debug.log";
             fileout = fopen(pathDebug.string().c_str(), "a");
             if (fileout) setbuf(fileout, NULL); // unbuffered
         }
@@ -246,7 +246,7 @@ inline int OutputDebugStringF(const char* pszFormat, ...)
             // reopen the log file, if requested
             if (fReopenDebugLog) {
                 fReopenDebugLog = false;
-                boost::filesystem::path pathDebug = GetDataDir() / "debug.log";
+                fs::path pathDebug = GetDataDir() / "debug.log";
                 if (freopen(pathDebug.string().c_str(),"a",fileout) != NULL)
                     setbuf(fileout, NULL); // unbuffered
             }
@@ -1067,9 +1067,9 @@ void PrintExceptionContinue(std::exception* pex, const char* pszThread)
     strMiscWarning = message;
 }
 
-boost::filesystem::path GetDefaultDataDir()
+fs::path GetDefaultDataDir()
 {
-    namespace fs = boost::filesystem;
+    namespace fs = fs;
     // Windows < Vista: C:\Documents and Settings\Username\Application Data\Magi
     // Windows >= Vista: C:\Users\Username\AppData\Roaming\Magi
     // Mac: ~/Library/Application Support/Magi
@@ -1096,9 +1096,9 @@ boost::filesystem::path GetDefaultDataDir()
 #endif
 }
 
-const boost::filesystem::path &GetDataDir(bool fNetSpecific)
+const fs::path &GetDataDir(bool fNetSpecific)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = fs;
 
     static fs::path pathCached[2];
     static CCriticalSection csPathCached;
@@ -1131,9 +1131,9 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
     return path;
 }
 
-boost::filesystem::path GetConfigFile()
+fs::path GetConfigFile()
 {
-    boost::filesystem::path pathConfigFile(GetArg("-conf", "magi.conf"));
+    fs::path pathConfigFile(GetArg("-conf", "magi.conf"));
     if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir(false) / pathConfigFile;
     return pathConfigFile;
 }
@@ -1141,7 +1141,7 @@ boost::filesystem::path GetConfigFile()
 void ReadConfigFile(map<string, string>& mapSettingsRet,
                     map<string, vector<string> >& mapMultiSettingsRet)
 {
-    boost::filesystem::ifstream streamConfig(GetConfigFile());
+    fs::ifstream streamConfig(GetConfigFile());
     if (!streamConfig.good())
         return; // No bitcoin.conf file is OK
 
@@ -1162,14 +1162,14 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
     }
 }
 
-boost::filesystem::path GetPidFile()
+fs::path GetPidFile()
 {
-    boost::filesystem::path pathPidFile(GetArg("-pid", "magid.pid"));
+    fs::path pathPidFile(GetArg("-pid", "magid.pid"));
     if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
     return pathPidFile;
 }
 
-void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
+void CreatePidFile(const fs::path &path, pid_t pid)
 {
     FILE* file = fopen(path.string().c_str(), "w");
     if (file)
@@ -1179,7 +1179,7 @@ void CreatePidFile(const boost::filesystem::path &path, pid_t pid)
     }
 }
 
-bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest)
+bool RenameOver(fs::path src, fs::path dest)
 {
 #ifdef WIN32
     return MoveFileExA(src.string().c_str(), dest.string().c_str(),
@@ -1213,7 +1213,7 @@ int GetFilesize(FILE* file)
 void ShrinkDebugFile()
 {
     // Scroll debug.log if it's getting too big
-    boost::filesystem::path pathLog = GetDataDir() / "debug.log";
+    fs::path pathLog = GetDataDir() / "debug.log";
     FILE* file = fopen(pathLog.string().c_str(), "r");
     if (file && GetFilesize(file) > 10 * 1000000)
     {
@@ -1326,9 +1326,9 @@ void AddTimeData(const CNetAddr& ip, int64 nTime)
 }
 
 #ifdef WIN32
-boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate)
+fs::path GetSpecialFolderPath(int nFolder, bool fCreate)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = fs;
 
     char pszPath[MAX_PATH] = "";
 

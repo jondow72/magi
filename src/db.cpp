@@ -60,7 +60,7 @@ void CDBEnv::Close()
     EnvShutdown();
 }
 
-bool CDBEnv::Open(boost::filesystem::path pathEnv_)
+bool CDBEnv::Open(fs::path pathEnv_)
 {
     if (fDbEnvInit)
         return true;
@@ -501,7 +501,7 @@ bool CAddrDB::Write(const CAddrMan& addr)
     ssPeers << hash;
 
     // open temp output file, and associate with CAutoFile
-    boost::filesystem::path pathTmp = GetDataDir() / tmpfn;
+    fs::path pathTmp = GetDataDir() / tmpfn;
     FILE *file = fopen(pathTmp.string().c_str(), "wb");
     CAutoFile fileout = CAutoFile(file, SER_DISK, CLIENT_VERSION);
     if (!fileout)

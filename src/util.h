@@ -226,15 +226,15 @@ bool WildcardMatch(const char* psz, const char* mask);
 bool WildcardMatch(const std::string& str, const std::string& mask);
 void FileCommit(FILE *fileout);
 int GetFilesize(FILE* file);
-bool RenameOver(boost::filesystem::path src, boost::filesystem::path dest);
-boost::filesystem::path GetDefaultDataDir();
-const boost::filesystem::path &GetDataDir(bool fNetSpecific = true);
-boost::filesystem::path GetConfigFile();
-boost::filesystem::path GetPidFile();
-void CreatePidFile(const boost::filesystem::path &path, pid_t pid);
+bool RenameOver(fs::path src, fs::path dest);
+fs::path GetDefaultDataDir();
+const fs::path &GetDataDir(bool fNetSpecific = true);
+fs::path GetConfigFile();
+fs::path GetPidFile();
+void CreatePidFile(const fs::path &path, pid_t pid);
 void ReadConfigFile(std::map<std::string, std::string>& mapSettingsRet, std::map<std::string, std::vector<std::string> >& mapMultiSettingsRet);
 #ifdef WIN32
-boost::filesystem::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
+fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
 void ShrinkDebugFile();
 int GetRandInt(int nMax);
