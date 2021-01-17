@@ -456,7 +456,7 @@ macx:QMAKE_CXXFLAGS_THREAD += -pthread
 # Set libraries and includes at end, to use platform-defined defaults if not overridden
 INCLUDEPATH += $$OPT_INCLUDE_PATH $$BOOST_INCLUDE_PATH $$BDB_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH $$GMP_INCLUDE_PATH
 LIBS += $$join(OPT_LIB_PATH,,-L,) $$join(BOOST_LIB_PATH,,-L,) $$join(BDB_LIB_PATH,,-L,) $$join(OPENSSL_LIB_PATH,,-L,) $$join(QRENCODE_LIB_PATH,,-L,) $$join(GMP_LIB_PATH,,-L,)
-LIBS += -lssl -lgmp -lcrypto -ldb_cxx$$BDB_LIB_SUFFIX
+LIBS += -lssl -lgmp -lcrypto -lboost_chrono$$BOOST_LIB_SUFFIX -ldb_cxx$$BDB_LIB_SUFFIX
 LIBS += $$OPT_LIBS
 # -lgdi32 has to happen after -lcrypto (see  #681)
 windows:LIBS += -lws2_32 -lshlwapi -lmswsock -lole32 -loleaut32 -luuid -lgdi32
