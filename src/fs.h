@@ -93,15 +93,3 @@ namespace fsbridge {
 };
 
 #endif // BITCOIN_FS_H
-© 2021 GitHub, Inc.
-Terms
-Privacy
-Security
-Status
-Help
-Contact GitHub
-Pricing
-API
-Training
-Blog
-About
