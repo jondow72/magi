@@ -1,4 +1,3 @@
-#include "fs.h"
 #include "guiutil.h"
 #include "magiaddressvalidator.h"
 #include "walletmodel.h"
