@@ -1,9 +1,6 @@
 /*
  * W.J. van der Laan 2011-2012
  */
-
-#include "fs.h"
-
 #include "magigui.h"
 #include "clientmodel.h"
 #include "walletmodel.h"
