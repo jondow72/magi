@@ -1,3 +1,4 @@
+#include "fs.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
