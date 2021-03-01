@@ -11,6 +11,7 @@
 #include "init.h"
 #include "ui_interface.h"
 #include "qtipcserver.h"
+#include "fs.h"
 
 #include <QApplication>
 #include <QMessageBox>
@@ -147,7 +148,7 @@ int main(int argc, char *argv[])
     ParseParameters(argc, argv);
 
     // ... then magi.conf:
-    if (!boost::filesystem::is_directory(GetDataDir(false)))
+    if (!fs::is_directory(GetDataDir(false)))
     {
         // This message can not be translated, as translation is not initialized yet
         // (which not yet possible because lang=XX can be overridden in magi.conf in the data directory)

@@ -5,6 +5,7 @@
 #ifndef BITCOIN_DB_H
 #define BITCOIN_DB_H
 
+#include "fs.h"
 #include "main.h"
 
 #include <map>
@@ -36,7 +37,7 @@ private:
     bool fDetachDB;
     bool fDbEnvInit;
     bool fMockDb;
-    boost::filesystem::path pathEnv;
+    fs::path pathEnv;
     std::string strPath;
 
     void EnvShutdown();
@@ -70,7 +71,7 @@ public:
     typedef std::pair<std::vector<unsigned char>, std::vector<unsigned char> > KeyValPair;
     bool Salvage(std::string strFile, bool fAggressive, std::vector<KeyValPair>& vResult);
 
-    bool Open(boost::filesystem::path pathEnv_);
+    bool Open(fs::path pathEnv_);
     void Close();
     void Flush(bool fShutdown);
     void CheckpointLSN(std::string strFile);
@@ -322,7 +323,7 @@ public:
 class CAddrDB
 {
 private:
-    boost::filesystem::path pathAddr;
+    fs::path pathAddr;
 public:
     CAddrDB();
     bool Write(const CAddrMan& addr);

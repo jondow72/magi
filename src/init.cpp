@@ -9,6 +9,7 @@
 #include "net.h"
 #include "util.h"
 #include "ui_interface.h"
+#include "fs.h"
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/convenience.hpp>
@@ -79,7 +80,7 @@ void Shutdown(void* parg)
         bitdb.Flush(false);
         StopNode();
         bitdb.Flush(true);
-        boost::filesystem::remove(GetPidFile());
+        fs::remove(GetPidFile());
         UnregisterWallet(pwalletMain);
         delete pwalletMain;
         NewThread(ExitTimeout, NULL);
@@ -129,7 +130,7 @@ bool AppInit(int argc, char* argv[])
         //
         // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
         ParseParameters(argc, argv);
-        if (!boost::filesystem::is_directory(GetDataDir(false)))
+        if (!fs::is_directory(GetDataDir(false)))
         {
             fprintf(stderr, "Error: Specified directory does not exist\n");
             Shutdown(NULL);
@@ -466,7 +467,7 @@ bool AppInit2()
     std::string strDataDir = GetDataDir().string();
 
     // Make sure only a single Bitcoin process is using the data directory.
-    boost::filesystem::path pathLockFile = GetDataDir() / ".lock";
+    fs::path pathLockFile = GetDataDir() / ".lock";
     FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
     if (file) fclose(file);
     static boost::interprocess::file_lock lock(pathLockFile.string().c_str());

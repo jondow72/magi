@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include "fs.h"
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -88,7 +89,7 @@ ParseScript(string s)
 Array
 read_json(const std::string& filename)
 {
-    namespace fs = boost::filesystem;
+    namespace fs = fs;
     fs::path testFile = fs::current_path() / "test" / "data" / filename;
 
 #ifdef TEST_DATA_DIR
