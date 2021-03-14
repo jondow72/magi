@@ -19,13 +19,13 @@ src/makefile-static*.mingw
 *.rej
 *.orig
 *.o
-*.patch
+#*.patch
 *.mod
 .magi
 
 # Compilation and Qt preprocessor part
 *.qm
-Makefile
+#Makefile
 m-wallet
 magi
 magi-qt
@@ -54,7 +54,7 @@ qt-builds/version-og/qrc_*.cpp
 .DS_Store
 qt-builds/version-og/build
 
-build*
+#build*
 builds
 build/*
 
