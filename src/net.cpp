@@ -58,7 +58,7 @@ CAddress addrSeenByPeerIp(CService("0.0.0.0", 0), nLocalServices);
 CAddress addrSeenByPeerIpv4(CService("0.0.0.0", 0), nLocalServices);
 CAddress addrSeenByPeerIpv6(CService("0.0.0.0", 0), nLocalServices);
 uint64 nLocalHostNonce = 0;
-array<int, THREAD_MAX> vnThreadsRunning;
+boost::array<int, THREAD_MAX> vnThreadsRunning;
 static std::vector<SOCKET> vhListenSocket;
 CAddrMan addrman;
 
