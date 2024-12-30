@@ -3,7 +3,7 @@
 
 #include "clientmodel.h"
 #include "walletmodel.h"
-#include "magiunits.h"
+#include "bitcoinunits.h"
 #include "optionsmodel.h"
 #include "transactiontablemodel.h"
 #include "transactionfilterproxy.h"

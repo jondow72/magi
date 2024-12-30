@@ -7,7 +7,7 @@
 #include "db.h"
 #include "txdb.h"
 #include "init.h"
-#include "magirpc.h"
+#include "bitcoinrpc.h"
 
 using namespace json_spirit;
 using namespace std;

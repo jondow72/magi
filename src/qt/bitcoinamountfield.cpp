@@ -1,6 +1,6 @@
-#include "magiamountfield.h"
+#include "bitcoinamountfield.h"
 #include "qvaluecombobox.h"
-#include "magiunits.h"
+#include "bitcoinunits.h"
 
 #include "guiconstants.h"
 

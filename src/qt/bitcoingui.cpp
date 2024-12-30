@@ -4,7 +4,7 @@
 
 #include <QApplication>
 
-#include "magigui.h"
+#include "bitcoingui.h"
 #include "transactiontablemodel.h"
 #include "addressbookpage.h"
 #include "sendcoinsdialog.h"
@@ -19,7 +19,7 @@
 #include "addresstablemodel.h"
 #include "transactionview.h"
 #include "overviewpage.h"
-#include "magiunits.h"
+#include "bitcoinunits.h"
 #include "guiconstants.h"
 #include "askpassphrasedialog.h"
 #include "notificator.h"
@@ -27,7 +27,7 @@
 #include "console.h"
 #include "rpcconsole.h"
 #include "wallet.h"
-#include "magirpc.h"
+#include "bitcoinrpc.h"
 
 #ifdef Q_OS_MAC
 #include "macdockiconhandler.h"

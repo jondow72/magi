@@ -2,7 +2,7 @@
 #include "ui_rpcconsole.h"
 
 #include "clientmodel.h"
-#include "magirpc.h"
+#include "bitcoinrpc.h"
 #include "guiutil.h"
 #include "guiconstants.h"
 #include <db_cxx.h>

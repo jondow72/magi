@@ -1,5 +1,5 @@
 #include "optionsmodel.h"
-#include "magiunits.h"
+#include "bitcoinunits.h"
 #include <QSettings>
 
 #include "init.h"

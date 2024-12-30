@@ -153,7 +153,7 @@
   <customwidget>
    <class>BitcoinAmountField</class>
    <extends>QSpinBox</extends>
-   <header>magiamountfield.h</header>
+   <header>bitcoinamountfield.h</header>
    <container>1</container>
   </customwidget>
   <customwidget>

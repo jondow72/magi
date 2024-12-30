@@ -1,7 +1,7 @@
 #include "guiutil.h"
-#include "magiaddressvalidator.h"
+#include "bitcoinaddressvalidator.h"
 #include "walletmodel.h"
-#include "magiunits.h"
+#include "bitcoinunits.h"
 #include "util.h"
 #include "init.h"
 

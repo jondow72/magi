@@ -138,7 +138,7 @@ OBJS= \
     obj/main.o \
     obj/net.o \
     obj/protocol.o \
-    obj/magirpc.o \
+    obj/bitcoinrpc.o \
     obj/rpcdump.o \
     obj/rpcnet.o \
     obj/rpcmining.o \
