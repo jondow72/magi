@@ -19,7 +19,7 @@
 
 using namespace std;
 using namespace boost;
-
+namespace fs = boost::filesystem;
 
 unsigned int nWalletDBUpdated;
 
@@ -60,7 +60,7 @@ void CDBEnv::Close()
     EnvShutdown();
 }
 
-bool CDBEnv::Open(boost::filesystem::path pathEnv_)
+bool CDBEnv::Open(fs::path pathEnv_)
 {
     if (fDbEnvInit)
         return true;
@@ -69,11 +69,11 @@ bool CDBEnv::Open(boost::filesystem::path pathEnv_)
         return false;
 
     pathEnv = pathEnv_;
-    filesystem::path pathDataDir = pathEnv;
+    fs::path pathDataDir = pathEnv;
     strPath = pathDataDir.string();
-    filesystem::path pathLogDir = pathDataDir / "database";
-    filesystem::create_directory(pathLogDir);
-    filesystem::path pathErrorFile = pathDataDir / "db.log";
+    fs::path pathLogDir = pathDataDir / "database";
+    fs::create_directory(pathLogDir);
+    fs::path pathErrorFile = pathDataDir / "db.log";
     printf("dbenv.open LogDir=%s ErrorFile=%s\n", pathLogDir.string().c_str(), pathErrorFile.string().c_str());
 
     unsigned int nEnvFlags = 0;
@@ -501,7 +501,7 @@ bool CAddrDB::Write(const CAddrMan& addr)
     ssPeers << hash;
 
     // open temp output file, and associate with CAutoFile
-    boost::filesystem::path pathTmp = GetDataDir() / tmpfn;
+    fs::path pathTmp = GetDataDir() / tmpfn;
     FILE *file = fopen(pathTmp.string().c_str(), "wb");
     CAutoFile fileout = CAutoFile(file, SER_DISK, CLIENT_VERSION);
     if (!fileout)

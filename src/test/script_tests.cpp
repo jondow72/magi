@@ -18,6 +18,7 @@
 using namespace std;
 using namespace json_spirit;
 using namespace boost::algorithm;
+namespace fs = boost::filesystem;
 
 extern uint256 SignatureHash(CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType);
 extern bool VerifyScript(const CScript& scriptSig, const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
@@ -88,7 +89,6 @@ ParseScript(string s)
 Array
 read_json(const std::string& filename)
 {
-    namespace fs = boost::filesystem;
     fs::path testFile = fs::current_path() / "test" / "data" / filename;
 
 #ifdef TEST_DATA_DIR
