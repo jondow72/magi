@@ -22,6 +22,7 @@
 
 using namespace std;
 using namespace boost;
+namespace fs = boost::filesystem;
 
 CWallet* pwalletMain;
 CClientUIInterface uiInterface;
@@ -79,7 +80,7 @@ void Shutdown(void* parg)
         bitdb.Flush(false);
         StopNode();
         bitdb.Flush(true);
-        boost::filesystem::remove(GetPidFile());
+        fs::remove(GetPidFile());
         UnregisterWallet(pwalletMain);
         delete pwalletMain;
         NewThread(ExitTimeout, NULL);
@@ -129,7 +130,7 @@ bool AppInit(int argc, char* argv[])
         //
         // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
         ParseParameters(argc, argv);
-        if (!boost::filesystem::is_directory(GetDataDir(false)))
+        if (!fs::is_directory(GetDataDir(false)))
         {
             fprintf(stderr, "Error: Specified directory does not exist\n");
             Shutdown(NULL);
@@ -466,7 +467,7 @@ bool AppInit2()
     std::string strDataDir = GetDataDir().string();
 
     // Make sure only a single Bitcoin process is using the data directory.
-    boost::filesystem::path pathLockFile = GetDataDir() / ".lock";
+    fs::path pathLockFile = GetDataDir() / ".lock";
     FILE* file = fopen(pathLockFile.string().c_str(), "a"); // empty lock file; created if it doesn't exist.
     if (file) fclose(file);
     static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
@@ -530,7 +531,7 @@ bool AppInit2()
             return false;
     }
 
-    if (filesystem::exists(GetDataDir() / "wallet.dat"))
+    if (fs::exists(GetDataDir() / "wallet.dat"))
     {
         CDBEnv::VerifyResult r = bitdb.Verify("wallet.dat", CWalletDB::Recover);
         if (r == CDBEnv::RECOVER_OK)
@@ -672,9 +673,9 @@ bool AppInit2()
 
     // ********************************************************* Step 7: load block chain
 
-    filesystem::path blocksDir = GetDataDir() / "blocks";
-    if (!filesystem::exists(blocksDir))
-        filesystem::create_directories(blocksDir);
+    fs::path blocksDir = GetDataDir() / "blocks";
+    if (!fs::exists(blocksDir))
+        fs::create_directories(blocksDir);
 
     if (!bitdb.Open(GetDataDir()))
     {
@@ -835,13 +836,13 @@ bool AppInit2()
         }
     }
 
-    filesystem::path pathBootstrap = GetDataDir() / "bootstrap.dat";
-    if (filesystem::exists(pathBootstrap)) {
+    fs::path pathBootstrap = GetDataDir() / "bootstrap.dat";
+    if (fs::exists(pathBootstrap)) {
         uiInterface.InitMessage(_("Importing bootstrap blockchain data file."));
 
         FILE *file = fopen(pathBootstrap.string().c_str(), "rb");
         if (file) {
-            filesystem::path pathBootstrapOld = GetDataDir() / "bootstrap.dat.old";
+            fs::path pathBootstrapOld = GetDataDir() / "bootstrap.dat.old";
             LoadExternalBlockFile(file);
             RenameOver(pathBootstrap, pathBootstrapOld);
         }

@@ -20,6 +20,7 @@
 
 using namespace std;
 using namespace boost;
+namespace fs = boost::filesystem;
 
 //
 // Global state
@@ -3367,7 +3368,7 @@ bool CBlock::CheckBlockSignature() const
 
 bool CheckDiskSpace(uint64 nAdditionalBytes)
 {
-    uint64 nFreeBytesAvailable = filesystem::space(GetDataDir()).available;
+    uint64 nFreeBytesAvailable = fs::space(GetDataDir()).available;
 
     // Check for nMinDiskSpace bytes (currently 50MB)
     if (nFreeBytesAvailable < nMinDiskSpace + nAdditionalBytes)
@@ -3384,7 +3385,7 @@ bool CheckDiskSpace(uint64 nAdditionalBytes)
 }
 
 
-static filesystem::path BlockFilePath(unsigned int nFile)
+static fs::path BlockFilePath(unsigned int nFile)
 {
     string strBlockFn = strprintf("blk%05u.dat", nFile);
     return GetDataDir() / "blocks" / strBlockFn;
