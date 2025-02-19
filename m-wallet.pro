@@ -22,18 +22,18 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 # winbuild dependencies
 win32 {
 #    BOOST_LIB_SUFFIX=-mgw49-mt-s-1_58
-    BOOST_INCLUDE_PATH=$$DEPSDIR/boost_1_58_0
-    BOOST_LIB_PATH=$$DEPSDIR/boost_1_58_0/stage/lib
-    BDB_INCLUDE_PATH=$$DEPSDIR/db-4.8.30.NC/build_unix
-    BDB_LIB_PATH=$$DEPSDIR/db-4.8.30.NC/build_unix
-    OPENSSL_INCLUDE_PATH=$$DEPSDIR/openssl-1.0.2j/include
-    OPENSSL_LIB_PATH=$$DEPSDIR/openssl-1.0.2j
-    MINIUPNPC_INCLUDE_PATH=$$DEPSDIR/miniupnpc
-    MINIUPNPC_LIB_PATH=$$DEPSDIR/miniupnpc
-    QRENCODE_INCLUDE_PATH=$$DEPSDIR/qrencode-3.4.3
-    QRENCODE_LIB_PATH=$$DEPSDIR/qrencode-3.4.3/.libs
-    GMP_INCLUDE_PATH=$$DEPSDIR/gmp-6.0.0
-    GMP_LIB_PATH=$$DEPSDIR/gmp-6.0.0/.libs
+    BOOST_INCLUDE_PATH=C:/msys64/home/magi/depends/include/boost-1_74
+    BOOST_LIB_PATH=C:/msys64/home/magi/depends/lib
+    BDB_INCLUDE_PATH=C:/msys64/home/magi/depends/include
+    BDB_LIB_PATH=C:/msys64/home/magi/depends/lib
+    OPENSSL_INCLUDE_PATH=C:/msys64/home/magi/depends/include/openssl
+    OPENSSL_LIB_PATH=C:/msys64/home/magi/depends/lib64
+    MINIUPNPC_INCLUDE_PATH=C:/msys64/home/magi/depends/miniupnpc-2.0
+    MINIUPNPC_LIB_PATH=C:/msys64/home/magi/depends/miniupnpc-2.0
+    QRENCODE_INCLUDE_PATH=C:/msys64/home/magi/depends/include
+    QRENCODE_LIB_PATH=C:/msys64/home/magi/depends/lib
+    GMP_INCLUDE_PATH=C:/msys64/home/magi/depends/include
+    GMP_LIB_PATH=C:/msys64/home/magi/depends/lib
 }
 
 OBJECTS_DIR = build
@@ -400,7 +400,7 @@ OTHER_FILES += README.md \
 # platform specific defaults, if not overridden on command line
 isEmpty(BOOST_LIB_SUFFIX) {
     macx:BOOST_LIB_SUFFIX = -mt-s
-    windows:BOOST_LIB_SUFFIX = -mgw49-mt-s-1_58
+    windows:BOOST_LIB_SUFFIX = -mgw14-mt-s-x64-1_74
 }
 
 isEmpty(BOOST_THREAD_LIB_SUFFIX) {
