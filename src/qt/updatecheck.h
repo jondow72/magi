@@ -44,7 +44,7 @@
 
 // url (temporary) for checking price
 #define BTC_PRICE_URL "https://api.coinmarketcap.com/v1/ticker/bitcoin/"
-#define MAGI_TO_USD_PRICE_URL "https://api.coinmarketcap.com/v1/ticker/magi/"
+#define MAGI_TO_USD_PRICE_URL "https://api.btcpop.co/exchange/XMG-BTC/"
 
 class UpdateCheck : public QObject
 {
