@@ -19,6 +19,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 # when linking against a specific BerkelyDB version: BDB_LIB_SUFFIX=-4.8
 
 # Dependency library locations can be customized using following settings 
+DEPSDIR=c:/msys64/home/Michiel
 # winbuild dependencies
 win32 {
 #    BOOST_LIB_SUFFIX=-mgw14-mt-s-x64-1_74
