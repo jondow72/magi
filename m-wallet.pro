@@ -21,7 +21,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 # Dependency library locations can be customized using following settings 
 # winbuild dependencies
 win32 {
-    DEPSDIR=c:/deps
+    DEPSDIR=c:/msys64/home/Michiel
 #    BOOST_LIB_SUFFIX=-mgw14-mt-s-x64-1_74
     BOOST_INCLUDE_PATH=$$DEPSDIR/boost_1_74_0
     BOOST_LIB_PATH=$$DEPSDIR/boost_1_74_0/stage/lib
