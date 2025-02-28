@@ -21,19 +21,20 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 # Dependency library locations can be customized using following settings 
 # winbuild dependencies
 win32 {
+    DEPSDIR=C:/msys64/home/Michiel
 #    BOOST_LIB_SUFFIX=-mgw49-mt-s-1_58
     BOOST_INCLUDE_PATH=$$DEPSDIR/boost_1_58_0
     BOOST_LIB_PATH=$$DEPSDIR/boost_1_58_0/stage/lib
     BDB_INCLUDE_PATH=$$DEPSDIR/db-4.8.30.NC/build_unix
     BDB_LIB_PATH=$$DEPSDIR/db-4.8.30.NC/build_unix
-    OPENSSL_INCLUDE_PATH=$$DEPSDIR/openssl-1.0.2j/include
-    OPENSSL_LIB_PATH=$$DEPSDIR/openssl-1.0.2j
+    OPENSSL_INCLUDE_PATH=$$DEPSDIR/openssl-3.0.16/include
+    OPENSSL_LIB_PATH=$$DEPSDIR/openssl-3.0.16
     MINIUPNPC_INCLUDE_PATH=$$DEPSDIR/miniupnpc
     MINIUPNPC_LIB_PATH=$$DEPSDIR/miniupnpc
     QRENCODE_INCLUDE_PATH=$$DEPSDIR/qrencode-3.4.3
     QRENCODE_LIB_PATH=$$DEPSDIR/qrencode-3.4.3/.libs
-    GMP_INCLUDE_PATH=$$DEPSDIR/gmp-6.0.0
-    GMP_LIB_PATH=$$DEPSDIR/gmp-6.0.0/.libs
+    GMP_INCLUDE_PATH=$$DEPSDIR/gmp-6.3.0
+    GMP_LIB_PATH=$$DEPSDIR/gmp-6.3.0/.libs
 }
 
 OBJECTS_DIR = build

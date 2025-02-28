@@ -17,16 +17,16 @@ INCLUDEPATHS= \
  -I"$(DEPSDIR)/boost_1_58_0" \
  -I"$(DEPSDIR)/db-4.8.30.NC/build_unix" \
  -I"$(DEPSDIR)/miniupnpc" \
- -I"$(DEPSDIR)/gmp-6.0.0" \
- -I"$(DEPSDIR)/openssl-1.0.2j/include"
+ -I"$(DEPSDIR)/gmp-6.3.0" \
+ -I"$(DEPSDIR)/openssl-3.0.16/include"
 
 LIBPATHS= \
  -L"$(CURDIR)/leveldb" \
  -L"$(DEPSDIR)/boost_1_58_0/stage/lib" \
  -L"$(DEPSDIR)/db-4.8.30.NC/build_unix" \
  -L"$(DEPSDIR)/miniupnpc" \
- -L"$(DEPSDIR)/gmp-6.0.0/.libs" \
- -L"$(DEPSDIR)/openssl-1.0.2j"
+ -L"$(DEPSDIR)/gmp-6.3.0/.libs" \
+ -L"$(DEPSDIR)/openssl-3.0.16"
  
 LIBS= \
  -l leveldb \
