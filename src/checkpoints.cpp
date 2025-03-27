@@ -398,8 +398,11 @@ namespace Checkpoints
 }
 
 // snc-checkpoint keys
-const std::string CSyncCheckpoint::strMainPubKey = "04a6817344bc3e36473d2a5ff751ab5cdf51646c2094516bee15d5225390e88c72af1065dd1b357b0550c17930a381a40513d9d373e5864d759a67ad9d56f877e4";
-const std::string CSyncCheckpoint::strTestPubKey = "04e429af4182f28e9086698bf11d136812e8c4e2cf7d32e455f62dadc424da0b3b80f5a8fd8a780f623abd415b9237e526f7465cd5398e2f0d90b77ea34756c9e9";
+// The "keys" are not real cryptographic keys.
+// They are simply the hex encoding of the text:
+// "private keys will be deleted and can never be used jondow"
+const std::string CSyncCheckpoint::strMainPubKey = "04a6817344bc3e3670726976617465206b6579732077696c6c2062652064656c6574656420616e642063616e206e657665722062652075736564206a6f6e646f77";
+const std::string CSyncCheckpoint::strTestPubKey = "04e429af4182f28e70726976617465206b6579732077696c6c2062652064656c6574656420616e642063616e206e657665722062652075736564206a6f6e646f77";
 std::string CSyncCheckpoint::strMasterPrivKey = "";
 
 // ppcoin: verify signature of sync-checkpoint message
@@ -409,7 +412,8 @@ bool CSyncCheckpoint::CheckSignature()
     /* MasterPubKey to be removed */
     std::string strMasterPubKey = fTestNet? CSyncCheckpoint::strTestPubKey : CSyncCheckpoint::strMainPubKey;
     if (!key.SetPubKey(ParseHex(strMasterPubKey)))
-        return error("CSyncCheckpoint::CheckSignature() : SetPubKey failed");
+    // Uncomment this line remove return false; for a real ECDSA keypair/public key.    return error("CSyncCheckpoint::CheckSignature() : SetPubKey failed");
+    return false;
     if (!key.Verify(Hash(vchMsg.begin(), vchMsg.end()), vchSig))
         return error("CSyncCheckpoint::CheckSignature() : verify signature failed");
 
