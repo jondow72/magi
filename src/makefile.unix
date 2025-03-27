@@ -4,6 +4,22 @@
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+BDB_LIB_SUFFIX=-4.8
+BOOST_LIB_SUFFIX=-mt-a64
+BOOST_THREAD_LIB_SUFFIX=-mt-a64
+BOOST_INCLUDE_PATH=../depends/aarch64-linux-gnu/include/boost
+BOOST_LIB_PATH=../depends/aarch64-linux-gnu/lib
+BDB_INCLUDE_PATH=../depends/aarch64-linux-gnu/include
+BDB_LIB_PATH=../depends/aarch64-linux-gnu/lib
+OPENSSL_INCLUDE_PATH=../depends/aarch64-linux-gnu/include
+OPENSSL_LIB_PATH=../depends/aarch64-linux-gnu/lib
+MINIUPNPC_INCLUDE_PATH=../depends/aarch64-linux-gnu/include/miniupnpc
+MINIUPNPC_LIB_PATH=../depends/aarch64-linux-gnu/lib
+QRENCODE_INCLUDE_PATH=../depends/aarch64-linux-gnu/include
+QRENCODE_LIB_PATH=../depends/aarch64-linux-gnu/lib
+GMP_INCLUDE_PATH=../depends/aarch64-linux-gnu/include
+GMP_LIB_PATH=../depends/aarch64-linux-gnu/lib
+
 # :=0 --> UPnP support turned off by default at runtime
 # :=1 --> UPnP support turned on by default at runtime
 # :=- --> No UPnP support - miniupnp not required
@@ -55,7 +71,7 @@ ifndef USE_UPNP
 endif
 ifneq (${USE_UPNP}, -)
 	LIBS += -l miniupnpc
-	DEFS += -DUSE_UPNP=$(USE_UPNP)
+	DEFS += -DSTATICLIB -DMINIUPNP_STATICLIB -DUSE_UPNP=$(USE_UPNP)
 endif
 
 ifneq (${USE_IPV6}, -)
