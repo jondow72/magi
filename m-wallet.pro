@@ -12,6 +12,168 @@ greaterThan(QT_MAJOR_VERSION, 4) {
     QT += widgets
 }
 
+# Detect architecture: prefer HOST for cross, fallback to QMAKE_TARGET.arch, fallback to uname -m
+isEmpty(HOST) {
+    DETECTED_ARCH = $$QMAKE_TARGET.arch
+    isEmpty(DETECTED_ARCH) {
+        DETECTED_ARCH = $$system(uname -m)
+    }
+} else {
+    DETECTED_ARCH = $$HOST
+}
+
+SSE2 = false
+DEPSDIR =
+BOOST_LIB_SUFFIX =
+BOOST_THREAD_LIB_SUFFIX =
+
+# Linux x86_64
+contains(DETECTED_ARCH, "x86_64-pc-linux-gnu") {
+    message(Detected x86_64-pc-linux-gnu)
+    DEPSDIR = /depends/x86_64-pc-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-x64
+    BOOST_THREAD_LIB_SUFFIX = -mt-x64
+    SSE2 = true
+}
+# Linux i686
+else:contains(DETECTED_ARCH, "i686-pc-linux-gnu") {
+    message(Detected i686-pc-linux-gnu)
+    DEPSDIR = /depends/i686-pc-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-x32
+    BOOST_THREAD_LIB_SUFFIX = -mt-x32
+    SSE2 = true
+}
+# Windows x86_64
+else:contains(DETECTED_ARCH, "x86_64-w64-mingw32") {
+    message(Detected x86_64-w64-mingw32)
+    DEPSDIR = /depends/x86_64-w64-mingw32
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-s-x64
+    BOOST_THREAD_LIB_SUFFIX = -mt-s-x64
+    SSE2 = true
+}
+# Windows i686
+else:contains(DETECTED_ARCH, "i686-w64-mingw32") {
+    message(Detected i686-w64-mingw32)
+    DEPSDIR = /depends/i686-w64-mingw32
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-s-x32
+    BOOST_THREAD_LIB_SUFFIX = -mt-s-x32
+    SSE2 = true
+}
+# Mac x86_64
+else:contains(DETECTED_ARCH, "x86_64-apple-darwin") {
+    message(Detected x86_64-apple-darwin)
+    DEPSDIR = /depends/x86_64-apple-darwin
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+    SSE2 = true
+}
+# Mac arm64
+else:contains(DETECTED_ARCH, "arm64-apple-darwin") {
+    message(Detected arm64-apple-darwin)
+    DEPSDIR = /depends/arm64-apple-darwin
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+}
+# Linux ARM 32
+else:contains(DETECTED_ARCH, "arm-linux-gnueabihf") {
+    message(Detected arm-linux-gnueabihf)
+    DEPSDIR = /depends/arm-linux-gnueabihf
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a32
+    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+}
+# Linux ARM 64
+else:contains(DETECTED_ARCH, "aarch64-linux-gnu") {
+    message(Detected aarch64-linux-gnu)
+    DEPSDIR = /depends/aarch64-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+}
+# PowerPC64
+else:contains(DETECTED_ARCH, "powerpc64-linux-gnu") {
+    message(Detected powerpc64-linux-gnu)
+    DEPSDIR = /depends/powerpc64-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-p64
+    BOOST_THREAD_LIB_SUFFIX = -mt-p64
+}
+# PowerPC64le
+else:contains(DETECTED_ARCH, "powerpc64le-linux-gnu") {
+    message(Detected powerpc64le-linux-gnu)
+    DEPSDIR = /depends/powerpc64le-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-p64
+    BOOST_THREAD_LIB_SUFFIX = -mt-p64
+}
+# RISC-V 32
+else:contains(DETECTED_ARCH, "riscv32-linux-gnu") {
+    message(Detected riscv32-linux-gnu)
+    DEPSDIR = /depends/riscv32-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a32
+    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+}
+# RISC-V 64
+else:contains(DETECTED_ARCH, "riscv64-linux-gnu") {
+    message(Detected riscv64-linux-gnu)
+    DEPSDIR = /depends/riscv64-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-r64
+    BOOST_THREAD_LIB_SUFFIX = -mt-r64
+}
+# S390x
+else:contains(DETECTED_ARCH, "s390x-linux-gnu") {
+    message(Detected s390x-linux-gnu)
+    DEPSDIR = /depends/s390x-linux-gnu
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-s64
+    BOOST_THREAD_LIB_SUFFIX = -mt-s64
+}
+# Android ARMv7a
+else:contains(DETECTED_ARCH, "armv7a-linux-android") {
+    message(Detected armv7a-linux-android)
+    DEPSDIR = /depends/armv7a-linux-android
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a32
+    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+}
+# Android ARM64
+else:contains(DETECTED_ARCH, "aarch64-linux-android") {
+    message(Detected aarch64-linux-android)
+    DEPSDIR = /depends/aarch64-linux-android
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+}
+# Android x86_64
+else:contains(DETECTED_ARCH, "x86_64-linux-android") {
+    message(Detected x86_64-linux-android)
+    DEPSDIR = /depends/x86_64-linux-android
+    BDB_LIB_SUFFIX=-4.8
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+    SSE2 = true
+}
+else {
+    error("Unknown or unsupported architecture ($$DETECTED_ARCH) -- please add to autodetect block")
+}
+
+# Set SSE2 flags if CPU supports it
+equals(SSE2, true) {
+    message(Building with SSE2 support)
+    QMAKE_CXXFLAGS += -msse2
+    QMAKE_CFLAGS += -msse2
+} else {
+    message(Building without SSE2 support)
+}
+
 # for boost > 1.37, add -mt to the boost libraries
 # use: qmake BOOST_LIB_SUFFIX=-mt
 # for boost thread win32 with _win32 sufix
@@ -20,7 +182,8 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 
 # Dependency library locations can be customized using following settings 
 # winbuild dependencies
-win32 {
+win32:!cross_compile {
+    # Native Windows build
 #    BOOST_LIB_SUFFIX=-mgw49-mt-s-1_58
     BOOST_INCLUDE_PATH=$$DEPSDIR/boost_1_58_0
     BOOST_LIB_PATH=$$DEPSDIR/boost_1_58_0/stage/lib
@@ -34,6 +197,20 @@ win32 {
     QRENCODE_LIB_PATH=$$DEPSDIR/qrencode-3.4.3/.libs
     GMP_INCLUDE_PATH=$$DEPSDIR/gmp-6.0.0
     GMP_LIB_PATH=$$DEPSDIR/gmp-6.0.0/.libs
+} else {
+    # Everything else (Linux, cross-compile, etc)
+    BOOST_INCLUDE_PATH=$$DEPSDIR/include/boost
+    BOOST_LIB_PATH=$$DEPSDIR/lib
+    BDB_INCLUDE_PATH=$$DEPSDIR/include
+    BDB_LIB_PATH=$$DEPSDIR/lib
+    OPENSSL_INCLUDE_PATH=$$DEPSDIR/include
+    OPENSSL_LIB_PATH=$$DEPSDIR/lib
+    MINIUPNPC_INCLUDE_PATH=$$DEPSDIR/include/miniupnpc
+    MINIUPNPC_LIB_PATH=$$DEPSDIR/lib
+    QRENCODE_INCLUDE_PATH=$$DEPSDIR/include
+    QRENCODE_LIB_PATH=$$DEPSDIR/lib
+    GMP_INCLUDE_PATH=$$DEPSDIR/include
+    GMP_LIB_PATH=$$DEPSDIR/lib
 }
 
 OBJECTS_DIR = build
@@ -82,7 +259,7 @@ contains(USE_UPNP, -) {
     count(USE_UPNP, 0) {
         USE_UPNP=1
     }
-    DEFINES += USE_UPNP=$$USE_UPNP STATICLIB
+    DEFINES += USE_UPNP=$$USE_UPNP STATICLIB MINIUPNP_STATICLIB
     INCLUDEPATH += $$MINIUPNPC_INCLUDE_PATH
     LIBS += $$join(MINIUPNPC_LIB_PATH,,-L,) -lminiupnpc
     win32:LIBS += -liphlpapi
@@ -376,9 +553,12 @@ CODECFORTR = UTF-8
 # also add new translations to src/qt/magi.qrc under translations/
 TRANSLATIONS = $$files(src/qt/locale/bitcoin_*.ts)
 
-isEmpty(QMAKE_LRELEASE) {
-    win32:QMAKE_LRELEASE = $$[QT_INSTALL_BINS]\\lrelease.exe
-    else:QMAKE_LRELEASE = $$[QT_INSTALL_BINS]/lrelease
+win32:!cross_compile {
+    # Native Windows build
+    QMAKE_LRELEASE = $$[QT_INSTALL_BINS]\\lrelease.exe
+} else {
+    # Everything else (Linux, cross-compile, etc)
+    QMAKE_LRELEASE = $$[QT_INSTALL_BINS]/lrelease
 }
 isEmpty(QM_DIR):QM_DIR = $$PWD/src/qt/locale
 # automatically build translations, so they can be included in resource file
