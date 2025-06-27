@@ -177,7 +177,7 @@ RPCConsole::RPCConsole(QWidget *parent) :
 //    ui->lineEdit->installEventFilter(this);
 //    ui->messagesWidget->installEventFilter(this);
 
-    connect(ui->clearButton, SIGNAL(clicked()), this, SLOT(clear()));
+//    connect(ui->clearButton, SIGNAL(clicked()), this, SLOT(clear()));
     connect(ui->btnClearTrafficGraph, SIGNAL(clicked()), ui->trafficGraph, SLOT(clear()));
 
     // set library version labels
@@ -192,8 +192,7 @@ RPCConsole::RPCConsole(QWidget *parent) :
 
     startExecutor();
     setTrafficGraphRange(INITIAL_TRAFFIC_GRAPH_MINS);
-
-    clear();
+//    clear();
 }
 
 RPCConsole::~RPCConsole()
