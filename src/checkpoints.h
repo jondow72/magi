@@ -19,6 +19,9 @@ class CSyncCheckpoint;
  */
 namespace Checkpoints
 {
+    typedef std::map<int, uint256> MapCheckpoints;
+    extern MapCheckpoints mapCheckpoints;
+    int GetLastCheckpointHeight();
     // Returns true if block passes checkpoint checks
     bool CheckHardened(int nHeight, const uint256& hash);
 
