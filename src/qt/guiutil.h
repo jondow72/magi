@@ -126,6 +126,8 @@ namespace GUIUtil
         QString coreOptions;
         QString uiOptions;
     };
+    /* Convert seconds into a QString with days, hours, mins, secs */
+    QString formatDurationStr(int secs);
 
     class QCLabel : public QLabel
     {
