@@ -326,11 +326,11 @@ namespace Checkpoints
     }
 
     // Verify sync checkpoint master pubkey and reset sync checkpoint if changed
-bool CheckCheckpointPubKey()
-{
-    // Checkpoint pubkey logic removed.
-    return true;
-}
+    bool CheckCheckpointPubKey()
+    {
+        // Checkpoint pubkey logic removed.
+        return true;
+    }
 
     bool SetCheckpointPrivKey(std::string strPrivKey)
     {
@@ -352,31 +352,32 @@ bool CheckCheckpointPubKey()
         return true;
     }
 
-bool SendSyncCheckpoint(uint256 hashCheckpoint)
-{
-    // Checkpoint signing logic removed; checkpoint is not signed or authenticated.
-    // Optionally, you can still relay the checkpoint if needed:
-    /*
-    CSyncCheckpoint checkpoint;
-    checkpoint.hashCheckpoint = hashCheckpoint;
-    CDataStream sMsg(SER_NETWORK, PROTOCOL_VERSION);
-    sMsg << (CUnsignedSyncCheckpoint)checkpoint;
-    checkpoint.vchMsg = std::vector<unsigned char>(sMsg.begin(), sMsg.end());
-
+    bool SendSyncCheckpoint(uint256 hashCheckpoint)
     {
-        LOCK(cs_vNodes);
-        BOOST_FOREACH(CNode* pnode, vNodes)
-            checkpoint.RelayTo(pnode);
-    }
-    */
-    return true;
-}
+        // Checkpoint signing logic removed; checkpoint is not signed or authenticated.
+        // Optionally, you can still relay the checkpoint if needed:
+        /*
+        CSyncCheckpoint checkpoint;
+        checkpoint.hashCheckpoint = hashCheckpoint;
+        CDataStream sMsg(SER_NETWORK, PROTOCOL_VERSION);
+        sMsg << (CUnsignedSyncCheckpoint)checkpoint;
+        checkpoint.vchMsg = std::vector<unsigned char>(sMsg.begin(), sMsg.end());
 
-bool CSyncCheckpoint::CheckSignature()
-{
-    // Signature checking has been removed as the key is intentionally invalid.
-    return true;
-}
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes)
+                checkpoint.RelayTo(pnode);
+        }
+        */
+        return true;
+    }
+
+    bool CSyncCheckpoint::CheckSignature()
+    {
+        // Signature checking has been removed as the key is intentionally invalid.
+        return true;
+    }
+
 
 // ppcoin: process synchronized checkpoint
 bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)

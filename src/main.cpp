@@ -2244,6 +2244,15 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
 // current block under processing
 bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 {
+    CBlockIndex* pLastCheckpoint = Checkpoints::GetLastCheckpoint(mapBlockIndex);
+    int lastCheckpointHeight = (pLastCheckpoint ? pLastCheckpoint->nHeight : 0);
+
+    if (pindex->nHeight > lastCheckpointHeight) {
+        return error("ConnectBlock(): refusing to process block past the last checkpoint (height: %d)", lastCheckpointHeight);
+    }
+
+    // ... original full validation logic below
+
     // Check it again in case a previous version let a bad block in
     if (!CheckBlock(!fJustCheck, !fJustCheck))
         return false;
