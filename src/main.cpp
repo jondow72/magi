@@ -18,6 +18,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 
+int lastCheckpointHeight = Checkpoints::GetLastCheckpointHeight();
+
 using namespace std;
 using namespace boost;
 
@@ -2244,6 +2246,11 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
 // current block under processing
 bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 {
+    int lastCheckpointHeight = Checkpoints::GetLastCheckpointHeight();
+    if (pindex->nHeight <= lastCheckpointHeight) {
+        // Fast sync: skip expensive checks for blocks up to last checkpoint
+        return true;
+    }
     // Check it again in case a previous version let a bad block in
     if (!CheckBlock(!fJustCheck, !fJustCheck))
         return false;

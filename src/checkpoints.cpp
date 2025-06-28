@@ -25,7 +25,7 @@ namespace Checkpoints
     //    timestamp before)
     // + Contains no strange transactions
     //
-    static MapCheckpoints mapCheckpoints =
+    MapCheckpoints mapCheckpoints =
         boost::assign::map_list_of
         ( 0,	hashGenesisBlockOfficial )
 	( 1999,	uint256("0x00000000221617cf173f4b7b972eb818cce4bebccf655df9b8045a1693614700"))
@@ -160,6 +160,11 @@ namespace Checkpoints
             return error("ValidateSyncCheckpoint: new sync-checkpoint %s is not a descendant of current sync-checkpoint %s", hashCheckpoint.ToString().c_str(), hashSyncCheckpoint.ToString().c_str());
         }
         return true;
+    }
+
+    int GetLastCheckpointHeight() {
+        if (mapCheckpoints.empty()) return 0;
+        return mapCheckpoints.rbegin()->first;
     }
 
     bool WriteSyncCheckpoint(const uint256& hashCheckpoint)
