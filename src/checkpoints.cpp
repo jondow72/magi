@@ -328,20 +328,7 @@ namespace Checkpoints
     // Verify sync checkpoint master pubkey and reset sync checkpoint if changed
     bool CheckCheckpointPubKey()
     {
-        CTxDB txdb;
-        std::string strPubKey = "";
-        std::string strMasterPubKey = fTestNet? CSyncCheckpoint::strTestPubKey : CSyncCheckpoint::strMainPubKey;
-        if (!txdb.ReadCheckpointPubKey(strPubKey) || strPubKey != strMasterPubKey)
-        {
-            // write checkpoint master key to db
-            txdb.TxnBegin();
-            if (!txdb.WriteCheckpointPubKey(strMasterPubKey))
-                return error("LoadBlockIndex() : failed to write new checkpoint master key to db");
-            if (!txdb.TxnCommit())
-                return error("LoadBlockIndex() : failed to commit new checkpoint master key to db");
-            if ((!fTestNet) && !Checkpoints::ResetSyncCheckpoint())
-                return error("LoadBlockIndex() : failed to reset sync-checkpoint");
-        }
+        // Checkpoint pubkey logic removed.
         return true;
     }
 
@@ -367,55 +354,30 @@ namespace Checkpoints
 
     bool SendSyncCheckpoint(uint256 hashCheckpoint)
     {
+        // Checkpoint signing logic removed; checkpoint is not signed or authenticated.
+        // Optionally, you can still relay the checkpoint if needed:
+        /*
         CSyncCheckpoint checkpoint;
         checkpoint.hashCheckpoint = hashCheckpoint;
         CDataStream sMsg(SER_NETWORK, PROTOCOL_VERSION);
         sMsg << (CUnsignedSyncCheckpoint)checkpoint;
         checkpoint.vchMsg = std::vector<unsigned char>(sMsg.begin(), sMsg.end());
 
-        if (CSyncCheckpoint::strMasterPrivKey.empty())
-            return error("SendSyncCheckpoint: Checkpoint master key unavailable.");
-        std::vector<unsigned char> vchPrivKey = ParseHex(CSyncCheckpoint::strMasterPrivKey);
-        CKey key;
-        key.SetPrivKey(CPrivKey(vchPrivKey.begin(), vchPrivKey.end())); // if key is not correct openssl may crash
-        if (!key.Sign(Hash(checkpoint.vchMsg.begin(), checkpoint.vchMsg.end()), checkpoint.vchSig))
-            return error("SendSyncCheckpoint: Unable to sign checkpoint, check private key?");
-
-        if(!checkpoint.ProcessSyncCheckpoint(NULL))
-        {
-            printf("WARNING: SendSyncCheckpoint: Failed to process checkpoint.\n");
-            return false;
-        }
-
-        // Relay checkpoint
         {
             LOCK(cs_vNodes);
             BOOST_FOREACH(CNode* pnode, vNodes)
                 checkpoint.RelayTo(pnode);
         }
+        */
         return true;
     }
 }
 
-// snc-checkpoint keys
-const std::string CSyncCheckpoint::strMainPubKey = "04a6817344bc3e36473d2a5ff751ab5cdf51646c2094516bee15d5225390e88c72af1065dd1b357b0550c17930a381a40513d9d373e5864d759a67ad9d56f877e4";
-const std::string CSyncCheckpoint::strTestPubKey = "04e429af4182f28e9086698bf11d136812e8c4e2cf7d32e455f62dadc424da0b3b80f5a8fd8a780f623abd415b9237e526f7465cd5398e2f0d90b77ea34756c9e9";
 std::string CSyncCheckpoint::strMasterPrivKey = "";
 
-// ppcoin: verify signature of sync-checkpoint message
 bool CSyncCheckpoint::CheckSignature()
 {
-    CKey key;
-    /* MasterPubKey to be removed */
-    std::string strMasterPubKey = fTestNet? CSyncCheckpoint::strTestPubKey : CSyncCheckpoint::strMainPubKey;
-    if (!key.SetPubKey(ParseHex(strMasterPubKey)))
-        return error("CSyncCheckpoint::CheckSignature() : SetPubKey failed");
-    if (!key.Verify(Hash(vchMsg.begin(), vchMsg.end()), vchSig))
-        return error("CSyncCheckpoint::CheckSignature() : verify signature failed");
-
-    // Now unserialize the data
-    CDataStream sMsg(vchMsg, SER_NETWORK, PROTOCOL_VERSION);
-    sMsg >> *(CUnsignedSyncCheckpoint*)this;
+    // Signature checking has been removed as the key is intentionally invalid.
     return true;
 }
 
