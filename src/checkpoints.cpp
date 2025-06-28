@@ -429,3 +429,8 @@ bool CSyncCheckpoint::ProcessSyncCheckpoint(CNode* pfrom)
     printf("ProcessSyncCheckpoint: sync-checkpoint at %s\n", hashCheckpoint.ToString().c_str());
     return true;
 }
+
+int GetLastCheckpointHeight() {
+    if (mapCheckpoints.empty()) return 0;
+    return mapCheckpoints.rbegin()->first;
+}
