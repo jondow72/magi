@@ -12,28 +12,169 @@ greaterThan(QT_MAJOR_VERSION, 4) {
     QT += widgets
 }
 
-# for boost > 1.37, add -mt to the boost libraries
-# use: qmake BOOST_LIB_SUFFIX=-mt
-# for boost thread win32 with _win32 sufix
-# use: BOOST_THREAD_LIB_SUFFIX=_win32-...
 # when linking against a specific BerkelyDB version: BDB_LIB_SUFFIX=-4.8
+BDB_LIB_SUFFIX=-4.8
 
-# Dependency library locations can be customized using following settings 
-# winbuild dependencies
-win32 {
-#    BOOST_LIB_SUFFIX=-mgw49-mt-s-1_58
-    BOOST_INCLUDE_PATH=$$DEPSDIR/boost_1_58_0
-    BOOST_LIB_PATH=$$DEPSDIR/boost_1_58_0/stage/lib
-    BDB_INCLUDE_PATH=$$DEPSDIR/db-4.8.30.NC/build_unix
-    BDB_LIB_PATH=$$DEPSDIR/db-4.8.30.NC/build_unix
-    OPENSSL_INCLUDE_PATH=$$DEPSDIR/openssl-1.0.2j/include
-    OPENSSL_LIB_PATH=$$DEPSDIR/openssl-1.0.2j
-    MINIUPNPC_INCLUDE_PATH=$$DEPSDIR/miniupnpc
-    MINIUPNPC_LIB_PATH=$$DEPSDIR/miniupnpc
-    QRENCODE_INCLUDE_PATH=$$DEPSDIR/qrencode-3.4.3
-    QRENCODE_LIB_PATH=$$DEPSDIR/qrencode-3.4.3/.libs
-    GMP_INCLUDE_PATH=$$DEPSDIR/gmp-6.0.0
-    GMP_LIB_PATH=$$DEPSDIR/gmp-6.0.0/.libs
+# === BEGIN: Automatic architecture detection and configuration ===
+
+# Try to use qmake's arch detection, fallback to uname -m if empty
+QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
+isEmpty(QMAKE_CPU_ARCH) {
+    QMAKE_CPU_ARCH = $$system(uname -m)
+}
+
+# Default: disable SSE2, clear vars
+SSE2 = false
+DEPSDIR =
+BOOST_LIB_SUFFIX =
+BOOST_THREAD_LIB_SUFFIX =
+
+# x86 64-bit Linux
+contains(QMAKE_CPU_ARCH, "x86_64") {
+    message(Detected architecture: x86_64 (Linux or MinGW64))
+    DEPSDIR = /depends/x86_64-pc-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-x64
+    BOOST_THREAD_LIB_SUFFIX = -mt-x64
+    SSE2 = true
+}
+# x86 32-bit Linux
+else:contains(QMAKE_CPU_ARCH, "i686")|contains(QMAKE_CPU_ARCH, "i386") {
+    message(Detected architecture: i686/i386 (Linux or MinGW32))
+    DEPSDIR = /depends/i686-pc-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-x32
+    BOOST_THREAD_LIB_SUFFIX = -mt-x32
+    SSE2 = true
+}
+# x86_64 Windows (MinGW)
+else:contains(HOST, "x86_64-w64-mingw32") {
+    message(Detected architecture: x86_64-w64-mingw32)
+    DEPSDIR = /depends/x86_64-w64-mingw32
+    BOOST_LIB_SUFFIX = -mt-s-x64
+    BOOST_THREAD_LIB_SUFFIX = -mt-s-x64
+    SSE2 = true
+}
+# i686 Windows (MinGW)
+else:contains(HOST, "i686-w64-mingw32") {
+    message(Detected architecture: i686-w64-mingw32)
+    DEPSDIR = /depends/i686-w64-mingw32
+    BOOST_LIB_SUFFIX = -mt-s-x32
+    BOOST_THREAD_LIB_SUFFIX = -mt-s-x32
+    SSE2 = true
+}
+# Mac x86_64
+else:contains(QMAKE_CPU_ARCH, "x86_64")|contains(HOST, "x86_64-apple-darwin") {
+    message(Detected architecture: Mac x86_64)
+    DEPSDIR = /depends/x86_64-apple-darwin
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+    SSE2 = true
+}
+# Mac arm64 (Apple Silicon)
+else:contains(QMAKE_CPU_ARCH, "arm64")|contains(HOST, "arm64-apple-darwin") {
+    message(Detected architecture: Mac arm64)
+    DEPSDIR = /depends/arm64-apple-darwin
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+}
+# Linux ARM 32
+else:contains(QMAKE_CPU_ARCH, "arm")|contains(HOST, "arm-linux-gnueabihf") {
+    message(Detected architecture: ARM 32-bit Linux)
+    DEPSDIR = /depends/arm-linux-gnueabihf
+    BOOST_LIB_SUFFIX = -mt-a32
+    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+}
+# Linux ARM 64
+else:contains(QMAKE_CPU_ARCH, "aarch64")|contains(HOST, "aarch64-linux-gnu") {
+    message(Detected architecture: ARM 64-bit Linux)
+    DEPSDIR = /depends/aarch64-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+}
+# PowerPC64
+else:contains(QMAKE_CPU_ARCH, "powerpc64")|contains(HOST, "powerpc64-linux-gnu") {
+    message(Detected architecture: PowerPC 64-bit)
+    DEPSDIR = /depends/powerpc64-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-p64
+    BOOST_THREAD_LIB_SUFFIX = -mt-p64
+}
+# PowerPC64le
+else:contains(HOST, "powerpc64le-linux-gnu") {
+    message(Detected architecture: PowerPC64le)
+    DEPSDIR = /depends/powerpc64le-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-p64
+    BOOST_THREAD_LIB_SUFFIX = -mt-p64
+}
+# RISC-V 32
+else:contains(QMAKE_CPU_ARCH, "riscv32")|contains(HOST, "riscv32-linux-gnu") {
+    message(Detected architecture: RISC-V 32)
+    DEPSDIR = /depends/riscv32-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-a32
+    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+}
+# RISC-V 64
+else:contains(QMAKE_CPU_ARCH, "riscv64")|contains(HOST, "riscv64-linux-gnu") {
+    message(Detected architecture: RISC-V 64)
+    DEPSDIR = /depends/riscv64-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-r64
+    BOOST_THREAD_LIB_SUFFIX = -mt-r64
+}
+# S390x
+else:contains(QMAKE_CPU_ARCH, "s390x")|contains(HOST, "s390x-linux-gnu") {
+    message(Detected architecture: s390x)
+    DEPSDIR = /depends/s390x-linux-gnu
+    BOOST_LIB_SUFFIX = -mt-s64
+    BOOST_THREAD_LIB_SUFFIX = -mt-s64
+}
+# Android ARM (32)
+else:contains(HOST, "armv7a-linux-android") {
+    message(Detected architecture: Android ARMv7a)
+    DEPSDIR = /depends/armv7a-linux-android
+    BOOST_LIB_SUFFIX = -mt-a32
+    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+}
+# Android ARM64
+else:contains(HOST, "aarch64-linux-android") {
+    message(Detected architecture: Android ARM64)
+    DEPSDIR = /depends/aarch64-linux-android
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+}
+# Android x86_64
+else:contains(HOST, "x86_64-linux-android") {
+    message(Detected architecture: Android x86_64)
+    DEPSDIR = /depends/x86_64-linux-android
+    BOOST_LIB_SUFFIX = -mt-a64
+    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+    SSE2 = true
+}
+else {
+    error("Unknown or unsupported architecture ($$QMAKE_CPU_ARCH / $$HOST) -- please add to autodetect block")
+}
+
+# Set SSE2 flags
+equals(SSE2, true) {
+    message(Building with SSE2 support)
+    QMAKE_CXXFLAGS += -msse2
+    QMAKE_CFLAGS += -msse2
+} else {
+    message(Building without SSE2 support)
+}
+
+# === END: Automatic architecture detection and configuration ===
+
+!isEmpty($$DEPSDIR) {
+    BOOST_INCLUDE_PATH=$$DEPSDIR/include/boost
+    BOOST_LIB_PATH=$$DEPSDIR/lib
+    BDB_INCLUDE_PATH=$$DEPSDIR/include
+    BDB_LIB_PATH=$$DEPSDIR/lib
+    OPENSSL_INCLUDE_PATH=$$DEPSDIR/include
+    OPENSSL_LIB_PATH=$$DEPSDIR/lib
+    MINIUPNPC_INCLUDE_PATH=$$DEPSDIR/include/miniupnpc
+    MINIUPNPC_LIB_PATH=$$DEPSDIR/lib
+    QRENCODE_INCLUDE_PATH=$$DEPSDIR/include
+    QRENCODE_LIB_PATH=$$DEPSDIR/lib
+    GMP_INCLUDE_PATH=$$DEPSDIR/include
+    GMP_LIB_PATH=$$DEPSDIR/lib
 }
 
 OBJECTS_DIR = build
@@ -82,7 +223,7 @@ contains(USE_UPNP, -) {
     count(USE_UPNP, 0) {
         USE_UPNP=1
     }
-    DEFINES += USE_UPNP=$$USE_UPNP STATICLIB
+    DEFINES += USE_UPNP=$$USE_UPNP STATICLIB MINIUPNP_STATICLIB
     INCLUDEPATH += $$MINIUPNPC_INCLUDE_PATH
     LIBS += $$join(MINIUPNPC_LIB_PATH,,-L,) -lminiupnpc
     win32:LIBS += -liphlpapi
@@ -154,24 +295,6 @@ QMAKE_CLEAN += $$PWD/src/leveldb/libleveldb.a; cd $$PWD/src/leveldb ; $(MAKE) cl
     QMAKE_EXTRA_TARGETS += genbuild
     DEFINES += HAVE_BUILD_INFO
 }
-
-# If we have an ARM device, we can't use SSE2 instructions, so don't try to use them
-QMAKE_XCPUARCH = $$QMAKE_HOST.arch
-equals(QMAKE_XCPUARCH, armv7l) {
-    message(Building without SSE2 support)
-}
-else:equals(QMAKE_XCPUARCH, armv6l) {
-    message(Building without SSE2 support)
-}
-else:equals(QMAKE_XCPUARCH, aarch64) {
-    message(Building without SSE2 support)
-}
-else {
-    message(Building with SSE2 support)
-    QMAKE_CXXFLAGS += -msse2
-    QMAKE_CFLAGS += -msse2
-}
-#endif
 
 QMAKE_CXXFLAGS_WARN_ON = -fdiagnostics-show-option -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter -Wstack-protector
 
