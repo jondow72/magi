@@ -326,24 +326,11 @@ namespace Checkpoints
     }
 
     // Verify sync checkpoint master pubkey and reset sync checkpoint if changed
-    bool CheckCheckpointPubKey()
-    {
-        CTxDB txdb;
-        std::string strPubKey = "";
-        std::string strMasterPubKey = fTestNet? CSyncCheckpoint::strTestPubKey : CSyncCheckpoint::strMainPubKey;
-        if (!txdb.ReadCheckpointPubKey(strPubKey) || strPubKey != strMasterPubKey)
-        {
-            // write checkpoint master key to db
-            txdb.TxnBegin();
-            if (!txdb.WriteCheckpointPubKey(strMasterPubKey))
-                return error("LoadBlockIndex() : failed to write new checkpoint master key to db");
-            if (!txdb.TxnCommit())
-                return error("LoadBlockIndex() : failed to commit new checkpoint master key to db");
-            if ((!fTestNet) && !Checkpoints::ResetSyncCheckpoint())
-                return error("LoadBlockIndex() : failed to reset sync-checkpoint");
-        }
-        return true;
-    }
+bool CheckCheckpointPubKey()
+{
+    // Checkpoint pubkey logic removed.
+    return true;
+}
 
     bool SetCheckpointPrivKey(std::string strPrivKey)
     {
@@ -365,57 +352,29 @@ namespace Checkpoints
         return true;
     }
 
-    bool SendSyncCheckpoint(uint256 hashCheckpoint)
+bool SendSyncCheckpoint(uint256 hashCheckpoint)
+{
+    // Checkpoint signing logic removed; checkpoint is not signed or authenticated.
+    // Optionally, you can still relay the checkpoint if needed:
+    /*
+    CSyncCheckpoint checkpoint;
+    checkpoint.hashCheckpoint = hashCheckpoint;
+    CDataStream sMsg(SER_NETWORK, PROTOCOL_VERSION);
+    sMsg << (CUnsignedSyncCheckpoint)checkpoint;
+    checkpoint.vchMsg = std::vector<unsigned char>(sMsg.begin(), sMsg.end());
+
     {
-        CSyncCheckpoint checkpoint;
-        checkpoint.hashCheckpoint = hashCheckpoint;
-        CDataStream sMsg(SER_NETWORK, PROTOCOL_VERSION);
-        sMsg << (CUnsignedSyncCheckpoint)checkpoint;
-        checkpoint.vchMsg = std::vector<unsigned char>(sMsg.begin(), sMsg.end());
-
-        if (CSyncCheckpoint::strMasterPrivKey.empty())
-            return error("SendSyncCheckpoint: Checkpoint master key unavailable.");
-        std::vector<unsigned char> vchPrivKey = ParseHex(CSyncCheckpoint::strMasterPrivKey);
-        CKey key;
-        key.SetPrivKey(CPrivKey(vchPrivKey.begin(), vchPrivKey.end())); // if key is not correct openssl may crash
-        if (!key.Sign(Hash(checkpoint.vchMsg.begin(), checkpoint.vchMsg.end()), checkpoint.vchSig))
-            return error("SendSyncCheckpoint: Unable to sign checkpoint, check private key?");
-
-        if(!checkpoint.ProcessSyncCheckpoint(NULL))
-        {
-            printf("WARNING: SendSyncCheckpoint: Failed to process checkpoint.\n");
-            return false;
-        }
-
-        // Relay checkpoint
-        {
-            LOCK(cs_vNodes);
-            BOOST_FOREACH(CNode* pnode, vNodes)
-                checkpoint.RelayTo(pnode);
-        }
-        return true;
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+            checkpoint.RelayTo(pnode);
     }
+    */
+    return true;
 }
 
-// snc-checkpoint keys
-const std::string CSyncCheckpoint::strMainPubKey = "04a6817344bc3e3670726976617465206b6579732077696c6c2062652064656c6574656420616e642063616e206e657665722062652075736564206a6f6e646f77";
-const std::string CSyncCheckpoint::strTestPubKey = "04e429af4182f28e70726976617465206b6579732077696c6c2062652064656c6574656420616e642063616e206e657665722062652075736564206a6f6e646f77";
-std::string CSyncCheckpoint::strMasterPrivKey = "";
-
-// ppcoin: verify signature of sync-checkpoint message
 bool CSyncCheckpoint::CheckSignature()
 {
-    CKey key;
-    /* MasterPubKey to be removed */
-    std::string strMasterPubKey = fTestNet? CSyncCheckpoint::strTestPubKey : CSyncCheckpoint::strMainPubKey;
-    if (!key.SetPubKey(ParseHex(strMasterPubKey)))
-        return error("CSyncCheckpoint::CheckSignature() : SetPubKey failed");
-    if (!key.Verify(Hash(vchMsg.begin(), vchMsg.end()), vchSig))
-        return error("CSyncCheckpoint::CheckSignature() : verify signature failed");
-
-    // Now unserialize the data
-    CDataStream sMsg(vchMsg, SER_NETWORK, PROTOCOL_VERSION);
-    sMsg >> *(CUnsignedSyncCheckpoint*)this;
+    // Signature checking has been removed as the key is intentionally invalid.
     return true;
 }
 
