@@ -1876,14 +1876,13 @@ bool IsInitialBlockDownload()
         return true;
     static int64 nLastUpdate;
     static CBlockIndex* pindexLastBest;
-    int64_t nCurrentTime = GetTime();
     if (pindexBest != pindexLastBest)
     {
         pindexLastBest = pindexBest;
-        nLastUpdate = nCurrentTime;
+        nLastUpdate = GetTime();
     }
-    return (nCurrentTime - nLastUpdate < 10 &&
-            pindexBest->GetBlockTime() < nCurrentTime - 24 * 60 * 60);
+    return (GetTime() - nLastUpdate < 10 &&
+            pindexBest->GetBlockTime() < GetTime() - 24 * 60 * 60);
 }
 
 void static InvalidChainFound(CBlockIndex* pindexNew)
@@ -2856,9 +2855,7 @@ bool CBlock::AddToBlockIndex(unsigned int nFile, unsigned int nBlockPos)
         hashPrevBestCoinBase = vtx[0].GetHash();
     }
 
-    static int8_t counter = 0;
-    if( (++counter & 0x0F) == 0 || !IsInitialBlockDownload()) // repaint every 16 blocks if not in initial block download
-        uiInterface.NotifyBlocksChanged();
+    uiInterface.NotifyBlocksChanged();
     return true;
 }
 
