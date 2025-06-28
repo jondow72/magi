@@ -1621,6 +1621,13 @@ Address: %4
     </message>
 </context>
 <context>
+    <name>TrafficGraphWidget</name>
+    <message>
+        <source>KB/s</source>
+        <translation>КБ/сек</translation>
+    </message>
+</context>
+<context>
     <name>TransactionDesc</name>
     <message>
         <location filename="../transactiondesc.cpp" line="+19"/>
