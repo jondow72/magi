@@ -379,8 +379,8 @@ Value getchainfo(const Array& params, bool fHelp)
     obj.push_back(Pair("diffMQW", GetDifficultyFromBits(bnBitsMQW)));
     obj.push_back(Pair("diffTarget", GetDifficultyFromBits(bnBitsTarget)));
 
-    CBlockIndex* pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
-    int64 deltaTime = pblockindex->GetBlockTime() - pcheckpoint->nTime;
+    //CBlockIndex* pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
+    //int64 deltaTime = pblockindex->GetBlockTime() - pcheckpoint->nTime;
 
     CBigNum bnNewBlock;
     bnNewBlock.SetCompact(pblockindex->nBits);
@@ -389,17 +389,17 @@ Value getchainfo(const Array& params, bool fHelp)
 
     const CBlockIndex* pcheckpointLast;
     if (pblockindex->IsProofOfStake()) {
-        bnRequired.SetCompact(ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblockindex->nTime));
-        nRequired = ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblockindex->nTime);
-        pcheckpointLast = GetLastBlockIndex(pcheckpoint, true);
+    //    bnRequired.SetCompact(ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblockindex->nTime));
+    //    nRequired = ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblockindex->nTime);
+    //    pcheckpointLast = GetLastBlockIndex(pcheckpoint, true);
     } else {
-        bnRequired.SetCompact(ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
-        nRequired = ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime);
-        pcheckpointLast = GetLastBlockIndex(pcheckpoint, false);
+    //    bnRequired.SetCompact(ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
+    //    nRequired = ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime);
+    //    pcheckpointLast = GetLastBlockIndex(pcheckpoint, false);
     }
 
-    obj.push_back(Pair("checkpoint-height", pcheckpoint->nHeight));
-    obj.push_back(Pair("deltaTime", (int) deltaTime));
+    //obj.push_back(Pair("checkpoint-height", pcheckpoint->nHeight));
+    //obj.push_back(Pair("deltaTime", (int) deltaTime));
     obj.push_back(Pair("pcheckpointLast-height", pcheckpointLast->nHeight));
 
     obj.push_back(Pair("bnNewBlock", HexBits(pblockindex->nBits)));
@@ -448,11 +448,11 @@ Value getautocheckpoint(const Array& params, bool fHelp)
             "Show info of auto synchronized checkpoint.\n");
 
     Object result;
-    const CBlockIndex* pindexCheckpoint = Checkpoints::AutoSelectSyncCheckpoint();
+    //const CBlockIndex* pindexCheckpoint = Checkpoints::AutoSelectSyncCheckpoint();
 
-    result.push_back(Pair("synccheckpoint", pindexCheckpoint->GetBlockHash().ToString().c_str()));
-    result.push_back(Pair("height", pindexCheckpoint->nHeight));
-    result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
+    //result.push_back(Pair("synccheckpoint", pindexCheckpoint->GetBlockHash().ToString().c_str()));
+    //result.push_back(Pair("height", pindexCheckpoint->nHeight));
+    //result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
 
     return result;
 }
@@ -465,13 +465,13 @@ Value getsynccheckpoint(const Array& params, bool fHelp)
             "Show info of synchronized checkpoint.\n");
 
     Object result;
-    result.push_back(Pair("checkpoint", Checkpoints::hashSyncCheckpoint.ToString().c_str()));
-    if (mapBlockIndex.count(Checkpoints::hashSyncCheckpoint))
-    {
-        CBlockIndex* pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];
-        result.push_back(Pair("height", pindexCheckpoint->nHeight));
-        result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
-    }
+    //result.push_back(Pair("checkpoint", Checkpoints::hashSyncCheckpoint.ToString().c_str()));
+    //if (mapBlockIndex.count(Checkpoints::hashSyncCheckpoint))
+    //{
+    //   CBlockIndex* pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];
+    //   result.push_back(Pair("height", pindexCheckpoint->nHeight));
+    //   result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
+    //}
 
     if (mapArgs.count("-checkpointkey"))
         result.push_back(Pair("checkpointmaster", true));
@@ -486,28 +486,28 @@ Value sendcheckpoint(const Array& params, bool fHelp)
             "sendcheckpoint <blockhash>\n"
             "Send a synchronized checkpoint.\n");
 
-    if (!mapArgs.count("-checkpointkey") || CSyncCheckpoint::strMasterPrivKey.empty())
-        throw runtime_error("Not a checkpointmaster node, first set checkpointkey in configuration and restart client. ");
+    //if (!mapArgs.count("-checkpointkey") || CSyncCheckpoint::strMasterPrivKey.empty())
+    //    throw runtime_error("Not a checkpointmaster node, first set checkpointkey in configuration and restart client. ");
 
     std::string strHash = params[0].get_str();
     uint256 hash(strHash);
 
-    if (!Checkpoints::SendSyncCheckpoint(hash))
-        throw runtime_error("Failed to send checkpoint, check log. ");
+    //if (!Checkpoints::SendSyncCheckpoint(hash))
+    //    throw runtime_error("Failed to send checkpoint, check log. ");
 
     Object result;
     CBlockIndex* pindexCheckpoint;
 
-    result.push_back(Pair("synccheckpoint", Checkpoints::hashSyncCheckpoint.ToString().c_str()));
-    if (mapBlockIndex.count(Checkpoints::hashSyncCheckpoint))
-    {
-        pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];
-        result.push_back(Pair("height", pindexCheckpoint->nHeight));
-        result.push_back(Pair("timestamp", (boost::int64_t) pindexCheckpoint->GetBlockTime()));
-    }
-    result.push_back(Pair("subscribemode", Checkpoints::IsSyncCheckpointEnforced()? "enforce" : "advisory"));
-    if (mapArgs.count("-checkpointkey"))
-        result.push_back(Pair("checkpointmaster", true));
+    //result.push_back(Pair("synccheckpoint", Checkpoints::hashSyncCheckpoint.ToString().c_str()));
+    //if (mapBlockIndex.count(Checkpoints::hashSyncCheckpoint))
+    //{
+    //    pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];
+    //    result.push_back(Pair("height", pindexCheckpoint->nHeight));
+    //     result.push_back(Pair("timestamp", (boost::int64_t) pindexCheckpoint->GetBlockTime()));
+    //}
+    //result.push_back(Pair("subscribemode", Checkpoints::IsSyncCheckpointEnforced()? "enforce" : "advisory"));
+    //if (mapArgs.count("-checkpointkey"))
+    //    result.push_back(Pair("checkpointmaster", true));
 
     return result;
 }
@@ -523,8 +523,8 @@ Value enforcecheckpoint(const Array& params, bool fHelp)
     if (mapArgs.count("-checkpointkey") && !fEnforceCheckpoint)
         throw runtime_error(
             "checkpoint master node must enforce synchronized checkpoints.");
-    if (fEnforceCheckpoint)
-        Checkpoints::strCheckpointWarning = "";
+    //if (fEnforceCheckpoint)
+    //    Checkpoints::strCheckpointWarning = "";
     mapArgs["-checkpointenforce"] = (fEnforceCheckpoint ? "1" : "0");
     return Value::null;
 }

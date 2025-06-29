@@ -373,11 +373,6 @@ bool CTxDB::LoadBlockIndex()
       hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(),
       DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
 
-    // Load hashSyncCheckpoint
-    if (!ReadSyncCheckpoint(Checkpoints::hashSyncCheckpoint))
-        return error("CTxDB::LoadBlockIndex() : hashSyncCheckpoint not loaded");
-    printf("LoadBlockIndex(): synchronized checkpoint %s\n", Checkpoints::hashSyncCheckpoint.ToString().c_str());
-
     // Load bnBestInvalidTrust, OK if it doesn't exist
 //    CBigNum bnBestInvalidTrust;
     ReadBestInvalidTrust(bnBestInvalidTrust);
