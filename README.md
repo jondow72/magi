@@ -1,13 +1,7 @@
 
-NovaCoin official development tree
+Magi development tree
 
-NovaCoin - a hybrid scrypt PoW + PoS based cryptocurrency.
-
-* 10 minute block spacing
-* The PoW subsidy halves every x64 multiply of PoW difficulty
-* The PoS interest halves every x64 multiply of PoS difficulty
-* Maximum PoW reward is 100 coins
-* ~ 2 billion total coins
+Magi is a PoS-based cryptocurrency.
 
 Development process
 ===========================
@@ -22,7 +16,7 @@ or are controversial.
 
 The master branch is regularly built and tested, but is not guaranteed
 to be completely stable. Tags are regularly created to indicate new
-official, stable release versions of NovaCoin.
+stable release versions of Magi.
 
 Feature branches are created when there are major new features being
 worked on by several people.

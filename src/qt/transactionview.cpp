@@ -74,7 +74,7 @@ TransactionView::TransactionView(QWidget *parent) :
     typeWidget->addItem(tr("Sent to"), TransactionFilterProxy::TYPE(TransactionRecord::SendToAddress) |
                                   TransactionFilterProxy::TYPE(TransactionRecord::SendToOther));
     typeWidget->addItem(tr("To yourself"), TransactionFilterProxy::TYPE(TransactionRecord::SendToSelf));
-    typeWidget->addItem(tr("Mined"), TransactionFilterProxy::TYPE(TransactionRecord::StakeMint));
+    typeWidget->addItem(tr("Minted"), TransactionFilterProxy::TYPE(TransactionRecord::StakeMint));
     typeWidget->addItem(tr("Mined"), TransactionFilterProxy::TYPE(TransactionRecord::Generated));
     typeWidget->addItem(tr("Other"), TransactionFilterProxy::TYPE(TransactionRecord::Other));
 
@@ -171,7 +171,7 @@ void TransactionView::setModel(WalletModel *model)
         transactionView->setSelectionBehavior(QAbstractItemView::SelectRows);
         transactionView->setSelectionMode(QAbstractItemView::ExtendedSelection);
         transactionView->setSortingEnabled(true);
-        transactionView->sortByColumn(TransactionTableModel::Status, Qt::DescendingOrder);
+        transactionView->sortByColumn(TransactionTableModel::Date, Qt::DescendingOrder);
         transactionView->verticalHeader()->hide();
 
         transactionView->horizontalHeader()->resizeSection(
@@ -180,8 +180,11 @@ void TransactionView::setModel(WalletModel *model)
                 TransactionTableModel::Date, 120);
         transactionView->horizontalHeader()->resizeSection(
                 TransactionTableModel::Type, 120);
-        transactionView->horizontalHeader()->setResizeMode(
-                TransactionTableModel::ToAddress, QHeaderView::Stretch);
+#if QT_VERSION < 0x050000
+        transactionView->horizontalHeader()->setResizeMode(TransactionTableModel::ToAddress, QHeaderView::Stretch);
+#else
+        transactionView->horizontalHeader()->setSectionResizeMode(TransactionTableModel::ToAddress, QHeaderView::Stretch);
+#endif
         transactionView->horizontalHeader()->resizeSection(
                 TransactionTableModel::Amount, 100);
     }

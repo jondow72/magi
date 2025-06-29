@@ -99,9 +99,13 @@ OBJS= \
     obj/noui.o \
     obj/pbkdf2.o \
     obj/kernel.o \
-    obj/scrypt_mine.o \
-    obj/scrypt-x86.o \
-    obj/scrypt-x86_64.o
+    obj/keccak.o \
+    obj/haval.o \
+    obj/ripemd.o \
+    obj/sha2.o \
+    obj/sha2big.o \
+    obj/tiger.o \
+    obj/whirlpool.o
 
 ifndef USE_UPNP
 	override USE_UPNP = -
@@ -119,10 +123,10 @@ ifneq (${USE_IPV6}, -)
 	DEFS += -DUSE_IPV6=$(USE_IPV6)
 endif
 
-all: novacoind
+all: magid
 
-test check: test_novacoin FORCE
-	./test_novacoin
+test check: test_magi FORCE
+	./test_magi
 
 # auto-generated dependencies:
 -include obj/*.P
@@ -140,13 +144,21 @@ obj/%.o: %.cpp
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
 
-obj/scrypt-x86.o: scrypt-x86.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
+obj/%.o: %.c
+	$(CXX) -c $(CFLAGS) -fpermissive -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
 
-obj/scrypt-x86_64.o: scrypt-x86_64.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
+obj/%.o: hash/%.c
+	$(CXX) -c $(CFLAGS) -fpermissive -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
 
-novacoind: $(OBJS:obj/%=obj/%)
+magid: $(OBJS:obj/%=obj/%)
 	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
@@ -158,11 +170,11 @@ obj-test/%.o: test/%.cpp
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
 
-test_novacoin: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
+test_magi: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
 	$(CXX) $(CFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS) $(TESTLIBS)
 
 clean:
-	-rm -f novacoind test_novacoin
+	-rm -f magid test_magi
 	-rm -f obj/*.o
 	-rm -f obj-test/*.o
 	-rm -f obj/*.P

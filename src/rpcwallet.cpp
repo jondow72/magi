@@ -69,7 +69,7 @@ Value getinfo(const Array& params, bool fHelp)
     proxyType proxy;
     GetProxy(NET_IPV4, proxy);
 
-    Object obj;
+    Object obj, diff;
     obj.push_back(Pair("version",       FormatFullVersion()));
     obj.push_back(Pair("protocolversion",(int)PROTOCOL_VERSION));
     obj.push_back(Pair("walletversion", pwalletMain->GetVersion()));
@@ -77,14 +77,20 @@ Value getinfo(const Array& params, bool fHelp)
     obj.push_back(Pair("newmint",       ValueFromAmount(pwalletMain->GetNewMint())));
     obj.push_back(Pair("stake",         ValueFromAmount(pwalletMain->GetStake())));
     obj.push_back(Pair("blocks",        (int)nBestHeight));
+    obj.push_back(Pair("timeoffset",    (int64_t)GetTimeOffset()));
     obj.push_back(Pair("moneysupply",   ValueFromAmount(pindexBest->nMoneySupply)));
     obj.push_back(Pair("connections",   (int)vNodes.size()));
     obj.push_back(Pair("proxy",         (proxy.first.IsValid() ? proxy.first.ToStringIPPort() : string())));
     obj.push_back(Pair("ip",            addrSeenByPeer.ToStringIP()));
-    obj.push_back(Pair("difficulty",    (double)GetDifficulty()));
+
+    diff.push_back(Pair("proof-of-work",  GetDifficulty()));
+    diff.push_back(Pair("proof-of-stake", GetDifficulty(GetLastBlockIndex(pindexBest, true))));
+    obj.push_back(Pair("difficulty",    diff));
+
     obj.push_back(Pair("testnet",       fTestNet));
     obj.push_back(Pair("keypoololdest", (boost::int64_t)pwalletMain->GetOldestKeyPoolTime()));
     obj.push_back(Pair("keypoolsize",   pwalletMain->GetKeyPoolSize()));
+    obj.push_back(Pair("mininput",      ValueFromAmount(nMinimumInputValue)));
     obj.push_back(Pair("paytxfee",      ValueFromAmount(nTransactionFee)));
     if (pwalletMain->IsCrypted())
         obj.push_back(Pair("unlocked_until", (boost::int64_t)nWalletUnlockTime / 1000));
@@ -126,7 +132,7 @@ Value getnewaddress(const Array& params, bool fHelp)
     if (fHelp || params.size() > 1)
         throw runtime_error(
             "getnewaddress [account]\n"
-            "Returns a new NovaCoin address for receiving payments.  "
+            "Returns a new Magi address for receiving payments.  "
             "If [account] is specified (recommended), it is added to the address book "
             "so payments received with the address will be credited to [account].");
 
@@ -193,7 +199,7 @@ Value getaccountaddress(const Array& params, bool fHelp)
     if (fHelp || params.size() != 1)
         throw runtime_error(
             "getaccountaddress <account>\n"
-            "Returns the current NovaCoin address for receiving payments to this account.");
+            "Returns the current Magi address for receiving payments to this account.");
 
     // Parse the account first so we don't generate a key if there's an error
     string strAccount = AccountFromValue(params[0]);
@@ -211,12 +217,12 @@ Value setaccount(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
-            "setaccount <novacoinaddress> <account>\n"
+            "setaccount <Magiaddress> <account>\n"
             "Sets the account associated with the given address.");
 
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid NovaCoin address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Magi address");
 
 
     string strAccount;
@@ -241,12 +247,12 @@ Value getaccount(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
-            "getaccount <novacoinaddress>\n"
+            "getaccount <Magiaddress>\n"
             "Returns the account associated with the given address.");
 
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid NovaCoin address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Magi address");
 
     string strAccount;
     map<CTxDestination, string>::iterator mi = pwalletMain->mapAddressBook.find(address.Get());
@@ -281,13 +287,13 @@ Value sendtoaddress(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 4)
         throw runtime_error(
-            "sendtoaddress <novacoinaddress> <amount> [comment] [comment-to]\n"
+		"sendtoaddress <Magiaddress> <amount> [comment] [comment-to]\n"
             "<amount> is a real and is rounded to the nearest 0.000001"
             + HelpRequiringPassphrase());
 
     CBitcoinAddress address(params[0].get_str());
     if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid NovaCoin address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Magi address");
 
     // Amount
     int64 nAmount = AmountFromValue(params[1]);
@@ -347,7 +353,7 @@ Value signmessage(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 2)
         throw runtime_error(
-            "signmessage <novacoinaddress> <message>\n"
+            "signmessage <Magiaddress> <message>\n"
             "Sign a message with the private key of an address");
 
     EnsureWalletIsUnlocked();
@@ -382,7 +388,7 @@ Value verifymessage(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 3)
         throw runtime_error(
-            "verifymessage <novacoinaddress> <signature> <message>\n"
+            "verifymessage <Magiaddress> <signature> <message>\n"
             "Verify a signed message");
 
     string strAddress  = params[0].get_str();
@@ -419,14 +425,14 @@ Value getreceivedbyaddress(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
-            "getreceivedbyaddress <novacoinaddress> [minconf=1]\n"
-            "Returns the total amount received by <novacoinaddress> in transactions with at least [minconf] confirmations.");
+            "getreceivedbyaddress <Magiaddress> [minconf=1]\n"
+            "Returns the total amount received by <Magiaddress> in transactions with at least [minconf] confirmations.");
 
     // Bitcoin address
     CBitcoinAddress address = CBitcoinAddress(params[0].get_str());
     CScript scriptPubKey;
     if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid NovaCoin address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Magi address");
     scriptPubKey.SetDestination(address.Get());
     if (!IsMine(*pwalletMain,scriptPubKey))
         return (double)0.0;
@@ -514,12 +520,17 @@ int64 GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMinD
         if (!wtx.IsFinal())
             continue;
 
-        int64 nGenerated, nReceived, nSent, nFee;
-        wtx.GetAccountAmounts(strAccount, nGenerated, nReceived, nSent, nFee);
+        int64 nGeneratedImmature, nGeneratedMature, nReceived, nSent, nFee;
+        wtx.GetAccountAmounts(strAccount, nGeneratedImmature, nGeneratedMature, nReceived, nSent, nFee);
 
         if (nReceived != 0 && wtx.GetDepthInMainChain() >= nMinDepth)
             nBalance += nReceived;
-        nBalance += nGenerated - nSent - nFee;
+
+		if((wtx.IsCoinBaseOrStake() && wtx.GetDepthInMainChain() >= nMinDepth && wtx.GetBlocksToMaturity() == 0)
+			|| !wtx.IsCoinBaseOrStake())
+		{
+			nBalance += nGeneratedMature - nSent - nFee;
+		}
     }
 
     // Tally internal accounting entries
@@ -573,10 +584,15 @@ Value getbalance(const Array& params, bool fHelp)
                 BOOST_FOREACH(const PAIRTYPE(CTxDestination,int64)& r, listReceived)
                     nBalance += r.second;
             }
-            BOOST_FOREACH(const PAIRTYPE(CTxDestination,int64)& r, listSent)
+
+			if((wtx.IsCoinBaseOrStake() && wtx.GetDepthInMainChain() >= nMinDepth && wtx.GetBlocksToMaturity() == 0)
+				|| !wtx.IsCoinBaseOrStake())
+			{
+				BOOST_FOREACH(const PAIRTYPE(CTxDestination,int64)& r, listSent)
                 nBalance -= r.second;
-            nBalance -= allFee;
-            nBalance += allGeneratedMature;
+				nBalance -= allFee;
+				nBalance += allGeneratedMature;
+			}
         }
         return  ValueFromAmount(nBalance);
     }
@@ -647,14 +663,14 @@ Value sendfrom(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 3 || params.size() > 6)
         throw runtime_error(
-            "sendfrom <fromaccount> <tonovacoinaddress> <amount> [minconf=1] [comment] [comment-to]\n"
+		"sendfrom <fromaccount> <toMagiaddress> <amount> [minconf=1] [comment] [comment-to]\n"
             "<amount> is a real and is rounded to the nearest 0.000001"
             + HelpRequiringPassphrase());
 
     string strAccount = AccountFromValue(params[0]);
     CBitcoinAddress address(params[1].get_str());
     if (!address.IsValid())
-        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid NovaCoin address");
+        throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Invalid Magi address");
     int64 nAmount = AmountFromValue(params[2]);
 
     if (nAmount < MIN_TXOUT_AMOUNT)
@@ -691,7 +707,7 @@ Value sendmany(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 4)
         throw runtime_error(
-            "sendmany <fromaccount> {address:amount,...} [minconf=1] [comment]\n"
+		"sendmany <fromaccount> {address:amount,...} [minconf=1] [comment]\n"
             "amounts are double-precision floating point numbers"
             + HelpRequiringPassphrase());
 
@@ -702,6 +718,7 @@ Value sendmany(const Array& params, bool fHelp)
         nMinDepth = params[2].get_int();
 
     CWalletTx wtx;
+	
     wtx.strFromAccount = strAccount;
     if (params.size() > 3 && params[3].type() != null_type && !params[3].get_str().empty())
         wtx.mapValue["comment"] = params[3].get_str();
@@ -714,7 +731,7 @@ Value sendmany(const Array& params, bool fHelp)
     {
         CBitcoinAddress address(s.name_);
         if (!address.IsValid())
-            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid NovaCoin address: ")+s.name_);
+            throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, string("Invalid Magi address: ")+s.name_);
 
         if (setAddress.count(address))
             throw JSONRPCError(RPC_INVALID_PARAMETER, string("Invalid parameter, duplicated address: ")+s.name_);
@@ -761,7 +778,7 @@ Value addmultisigaddress(const Array& params, bool fHelp)
     {
         string msg = "addmultisigaddress <nrequired> <'[\"key\",\"key\"]'> [account]\n"
             "Add a nrequired-to-sign multisignature address to the wallet\"\n"
-            "each key is a NovaCoin address or hex-encoded public key\n"
+            "each key is a Magi address or hex-encoded public key\n"
             "If [account] is specified, assign address to [account].";
         throw runtime_error(msg);
     }
@@ -1133,23 +1150,34 @@ Value listaccounts(const Array& params, bool fHelp)
     for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
     {
         const CWalletTx& wtx = (*it).second;
+
+		if(!wtx.IsFinal())
+			continue;
+
         int64 nGeneratedImmature, nGeneratedMature, nFee;
         string strSentAccount;
         list<pair<CTxDestination, int64> > listReceived;
         list<pair<CTxDestination, int64> > listSent;
         wtx.GetAmounts(nGeneratedImmature, nGeneratedMature, listReceived, listSent, nFee, strSentAccount);
-        mapAccountBalances[strSentAccount] -= nFee;
-        BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64)& s, listSent)
-            mapAccountBalances[strSentAccount] -= s.second;
         if (wtx.GetDepthInMainChain() >= nMinDepth)
         {
-            mapAccountBalances[""] += nGeneratedMature;
             BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64)& r, listReceived)
                 if (pwalletMain->mapAddressBook.count(r.first))
                     mapAccountBalances[pwalletMain->mapAddressBook[r.first]] += r.second;
                 else
                     mapAccountBalances[""] += r.second;
         }
+
+		if((wtx.IsCoinBaseOrStake() && wtx.GetDepthInMainChain() >= nMinDepth && wtx.GetBlocksToMaturity() == 0)
+			|| !wtx.IsCoinBaseOrStake())
+		{
+			mapAccountBalances[strSentAccount] -= nFee;
+			mapAccountBalances[""] += nGeneratedMature;
+
+			BOOST_FOREACH(const PAIRTYPE(CTxDestination, int64)& s, listSent)
+				mapAccountBalances[strSentAccount] -= s.second;
+
+		}
     }
 
     list<CAccountingEntry> acentries;
@@ -1512,7 +1540,7 @@ Value encryptwallet(const Array& params, bool fHelp)
     // slack space in .dat files; that is bad if the old data is
     // unencrypted private keys. So:
     StartShutdown();
-    return "wallet encrypted; NovaCoin server stopping, restart to run with encrypted wallet.  The keypool has been flushed, you need to make a new backup.";
+    return "wallet encrypted; Magi server stopping, restart to run with encrypted wallet.  The keypool has been flushed, you need to make a new backup.";
 }
 
 class DescribeAddressVisitor : public boost::static_visitor<Object>
@@ -1554,8 +1582,8 @@ Value validateaddress(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
-            "validateaddress <novacoinaddress>\n"
-            "Return information about <novacoinaddress>.");
+            "validateaddress <Magiaddress>\n"
+            "Return information about <Magiaddress>.");
 
     CBitcoinAddress address(params[0].get_str());
     bool isValid = address.IsValid();
@@ -1583,8 +1611,8 @@ Value validatepubkey(const Array& params, bool fHelp)
 {
     if (fHelp || !params.size() || params.size() > 2)
         throw runtime_error(
-            "validatepubkey <novacoinpubkey>\n"
-            "Return information about <novacoinpubkey>.");
+            "validatepubkey <Magipubkey>\n"
+            "Return information about <Magipubkey>.");
 
     std::vector<unsigned char> vchPubKey = ParseHex(params[0].get_str());
     CPubKey pubKey(vchPubKey);
@@ -1703,7 +1731,7 @@ Value repairwallet(const Array& params, bool fHelp)
     return result;
 }
 
-// NovaCoin: resend unconfirmed wallet transactions
+// Magi: resend unconfirmed wallet transactions
 Value resendtx(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)

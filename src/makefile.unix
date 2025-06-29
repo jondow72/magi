@@ -2,14 +2,20 @@
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+# :=0 --> UPnP support turned off by default at runtime
+# :=1 --> UPnP support turned on by default at runtime
+# :=- --> No UPnP support - miniupnp not required
 USE_UPNP:=0
+
+# :=1 --> Enable IPv6 support
+# :=0 --> Disable IPv6 support
 USE_IPV6:=1
 
 LINK:=$(CXX)
 
 DEFS=-DBOOST_SPIRIT_THREADSAFE
 
-DEFS += $(addprefix -I,$(CURDIR) $(CURDIR)/obj $(BOOST_INCLUDE_PATH) $(BDB_INCLUDE_PATH) $(OPENSSL_INCLUDE_PATH))
+DEFS += $(addprefix -I,$(CURDIR) $(CURDIR)/hash $(CURDIR)/obj $(BOOST_INCLUDE_PATH) $(BDB_INCLUDE_PATH) $(OPENSSL_INCLUDE_PATH))
 LIBS = $(addprefix -L,$(BOOST_LIB_PATH) $(BDB_LIB_PATH) $(OPENSSL_LIB_PATH))
 
 TESTDEFS = -DTEST_DATA_DIR=$(abspath test/data)
@@ -34,6 +40,7 @@ LIBS += \
    -l boost_thread$(BOOST_LIB_SUFFIX) \
    -l db_cxx$(BDB_LIB_SUFFIX) \
    -l ssl \
+   -l gmp \
    -l crypto
 
 ifndef USE_UPNP
@@ -130,15 +137,18 @@ OBJS= \
     obj/noui.o \
     obj/kernel.o \
     obj/pbkdf2.o \
-    obj/scrypt_mine.o \
-    obj/scrypt-x86.o \
-    obj/scrypt-x86_64.o
+    obj/keccak.o \
+    obj/haval.o \
+    obj/ripemd.o \
+    obj/sha2.o \
+    obj/sha2big.o \
+    obj/tiger.o \
+    obj/whirlpool.o
+    
+all: magid
 
-
-all: novacoind
-
-test check: test_novacoin FORCE
-	./test_novacoin
+test check: test_magi FORCE
+	./test_magi
 
 # auto-generated dependencies:
 -include obj/*.P
@@ -149,12 +159,6 @@ obj/build.h: FORCE
 version.cpp: obj/build.h
 DEFS += -DHAVE_BUILD_INFO
 
-obj/scrypt-x86.o: scrypt-x86.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
-
-obj/scrypt-x86_64.o: scrypt-x86_64.S
-	$(CXX) -c $(xCXXFLAGS) -MMD -o $@ $<
-
 obj/%.o: %.cpp
 	$(CXX) -c $(xCXXFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
 	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
@@ -162,7 +166,28 @@ obj/%.o: %.cpp
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
 
-novacoind: $(OBJS:obj/%=obj/%)
+obj/%.o: %.c
+	$(CXX) -c $(xCXXFLAGS) -fpermissive -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
+
+obj/%.o: hash/%.cpp
+	$(CXX) -c $(xCXXFLAGS) -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
+
+obj/%.o: hash/%.c
+	$(CXX) -c $(xCXXFLAGS) -fpermissive -MMD -MF $(@:%.o=%.d) -o $@ $<
+	@cp $(@:%.o=%.d) $(@:%.o=%.P); \
+	  sed -e 's/#.*//' -e 's/^[^:]*: *//' -e 's/ *\\$$//' \
+	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
+	  rm -f $(@:%.o=%.d)
+
+magid: $(OBJS:obj/%=obj/%)
 	$(LINK) $(xCXXFLAGS) -o $@ $^ $(xLDFLAGS) $(LIBS)
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
@@ -174,11 +199,11 @@ obj-test/%.o: test/%.cpp
 	      -e '/^$$/ d' -e 's/$$/ :/' < $(@:%.o=%.d) >> $(@:%.o=%.P); \
 	  rm -f $(@:%.o=%.d)
 
-test_novacoin: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
+test_magi: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
 	$(LINK) $(xCXXFLAGS) -o $@ $(LIBPATHS) $^ -Wl,-B$(LMODE) -lboost_unit_test_framework $(xLDFLAGS) $(LIBS)
 
 clean:
-	-rm -f novacoind test_novacoin
+	-rm -f magid test_magi
 	-rm -f obj/*.o
 	-rm -f obj-test/*.o
 	-rm -f obj/*.P

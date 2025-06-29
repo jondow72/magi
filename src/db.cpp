@@ -651,9 +651,10 @@ bool CTxDB::LoadBlockIndex()
     pindexBest = mapBlockIndex[hashBestChain];
     nBestHeight = pindexBest->nHeight;
     bnBestChainTrust = pindexBest->bnChainTrust;
-    printf("LoadBlockIndex(): hashBestChain=%s  height=%d  trust=%s  date=%s\n",
-      hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(),
-      DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
+//    if(pindexBest) {if(pindexBest->pprev) nLastPrevMoneySupply = (pindexBest->pprev)->nMoneySupply;}
+    printf("LoadBlockIndex(): hashBestChain=%s  height=%d  trust=%s  MoneySupply=%"PRI64d"  date=%s\n",
+      hashBestChain.ToString().substr(0,20).c_str(), nBestHeight, bnBestChainTrust.ToString().c_str(), 
+      pindexBest->nMoneySupply, DateTimeStrFormat("%x %H:%M:%S", pindexBest->GetBlockTime()).c_str());
 
     // ppcoin: load hashSyncCheckpoint
     if (!ReadSyncCheckpoint(Checkpoints::hashSyncCheckpoint))
@@ -802,7 +803,7 @@ bool CTxDB::LoadBlockIndexGuts()
 
     // Load mapBlockIndex
     unsigned int fFlags = DB_SET_RANGE;
-    loop
+    while (true)
     {
         // Read next record
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
