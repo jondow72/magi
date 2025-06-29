@@ -78,7 +78,6 @@ CFLAGS += -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter \
     $(DEBUGFLAGS) $(DEFS) $(INCLUDEPATHS)
 
 OBJS= \
-    obj/alert.o \
     obj/clientversion.o \
     obj/checkpoints.o \
     obj/netbase.o \
