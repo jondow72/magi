@@ -2246,7 +2246,7 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
 // current block under processing
 bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 {
-    int customSlowSyncHeight = 20000; // <-- set this to your desired value
+    int customSlowSyncHeight = 30000; // <-- set this to your desired value
     int lastCheckpointHeight = Checkpoints::GetLastCheckpointHeight();
 
     // Decide validation mode
