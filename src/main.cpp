@@ -2246,9 +2246,20 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
 // current block under processing
 bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 {
+    int customSlowSyncHeight = 20000; // <-- set this to your desired value
     int lastCheckpointHeight = Checkpoints::GetLastCheckpointHeight();
-    if (pindex->nHeight <= lastCheckpointHeight) {
-        // Fast sync: skip expensive checks for blocks up to last checkpoint
+
+    // Decide validation mode
+    bool doFullValidation = (pindex->nHeight <= customSlowSyncHeight) || (pindex->nHeight > lastCheckpointHeight);
+
+    // Always basic block checks
+    if (!CheckBlock(!fJustCheck, !fJustCheck))
+        return false;
+
+    // Fast sync: skip expensive checks between customSlowSyncHeight and lastCheckpointHeight
+    if (!doFullValidation) {
+        // Fast sync: skip expensive transaction/script checks
+        // You may want to just return true here, or do minimal checks as needed
         return true;
     }
     // Check it again in case a previous version let a bad block in
