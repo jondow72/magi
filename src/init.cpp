@@ -3,6 +3,7 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "init.h"
+#include "checkqueue.h"    // If starting/stopping checkqueue threads
 #include "walletdb.h"
 #include "magirpc.h"
 #include "txdb.h"

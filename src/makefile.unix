@@ -125,6 +125,7 @@ xLDFLAGS=$(LDHARDENING) $(LDFLAGS) $(OPT_LIB_PATHS)
 
 OBJS= \
     obj/alert.o \
+    obj/scriptcheck.o \
     obj/clientversion.o \
     obj/checkpoints.o \
     obj/netbase.o \

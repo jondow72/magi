@@ -545,7 +545,9 @@ typedef std::map<uint256, std::pair<CTxIndex, CTransaction> > MapPrevTx;
 class CTransaction
 {
 public:
-    static const int CURRENT_VERSION=1;
+//    void SetNull();
+    CTransaction();
+    static const int CURRENT_VERSION = 1;
 
     int nVersion;
     unsigned int nTime;
@@ -557,20 +559,20 @@ public:
     mutable int nDoS;
     bool DoS(int nDoSIn, bool fIn) const { nDoS += nDoSIn; return fIn; }
 
-    CTransaction()
-    {
-        SetNull();
-    }
+//    CTransaction()
+//    {
+//        SetNull();
+//    }
 
-    IMPLEMENT_SERIALIZE
-    (
-        READWRITE(this->nVersion);
-        nVersion = this->nVersion;
-        READWRITE(nTime);
-        READWRITE(vin);
-        READWRITE(vout);
-        READWRITE(nLockTime);
-	)
+//    IMPLEMENT_SERIALIZE
+//    (
+//        READWRITE(this->nVersion);
+//        nVersion = this->nVersion;
+//        READWRITE(nTime);
+//        READWRITE(vin);
+//        READWRITE(vout);
+//        READWRITE(nLockTime);
+//	)
 
     void SetNull()
     {
@@ -658,6 +660,24 @@ public:
     /** Check for standard transaction types
         @return True if all outputs (scriptPubKeys) use only standard transaction forms
     */
+//    bool ConnectInputs(
+//        CTxDB& txdb,
+//        MapPrevTx inputs,
+//        std::map<uint256, CTxIndex>& mapTestPool,
+//        const CDiskTxPos& posThisTx,
+//        const CBlockIndex* pindexBlock,
+//        bool fBlock,
+//        bool fMiner,
+//        bool fStrictPayToScriptHash
+//    ) const;
+//
+//    bool IsNull() const;
+//    uint256 GetHash() const;
+//    bool IsFinal(int nBlockHeight=0, int64 nBlockTime=0) const;
+//    bool IsNewerThan(const CTransaction& old) const;
+//    bool IsCoinBase() const;
+//    bool IsCoinStake() const;
+//    bool IsCoinBaseOrStake() const;
     bool IsStandard() const;
 
     /** Check for standard transaction types
@@ -683,6 +703,15 @@ public:
 
     /** Amount of bitcoins spent by this transaction.
         @return sum of all outputs (note: does not include fees)
+     */
+
+    /** Amount of bitcoins coming in to this transaction
+        Note that lightweight clients may not know anything besides the hash of previous transactions,
+        so may not be able to calculate this.
+
+        @param[in] mapInputs	Map of previous transactions that have outputs we're spending
+        @return	Sum of value of all inputs (scriptSigs)
+        @see CTransaction::FetchInputs
      */
     int64 GetValueOut() const
     {
@@ -787,7 +816,12 @@ public:
     {
         printf("%s", ToString().c_str());
     }
+    friend bool operator==(const CTransaction& a, const CTransaction& b);
+    friend bool operator!=(const CTransaction& a, const CTransaction& b);
 
+//    std::string ToStringShort() const;
+//    std::string ToString() const;
+//    void print() const;
 
     bool ReadFromDisk(CTxDB& txdb, COutPoint prevout, CTxIndex& txindexRet);
     bool ReadFromDisk(CTxDB& txdb, COutPoint prevout);
@@ -830,6 +864,17 @@ public:
 
 protected:
     const CTxOut& GetOutputFor(const CTxIn& input, const MapPrevTx& inputs) const;
+
+public:
+    IMPLEMENT_SERIALIZE
+    (
+        READWRITE(this->nVersion);
+        nVersion = this->nVersion;
+        READWRITE(nTime);
+        READWRITE(vin);
+        READWRITE(vout);
+        READWRITE(nLockTime);
+    )
 };
 
 

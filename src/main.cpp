@@ -3,6 +3,9 @@
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "main.h"
+#include "scriptcheck.h"   // Needed for CScriptCheck
+#include "checkqueue.h"    // Needed for CheckQueue<CScriptCheck>
 #include "alert.h"
 #include "checkpoints.h"
 #include "db.h"
@@ -24,6 +27,11 @@ using namespace boost;
 //
 // Global state
 //
+
+CTransaction::CTransaction() { SetNull(); }
+
+// Global queue for script checks (adjust 128 to your desired batch size)
+CCheckQueue<CScriptCheck> scriptcheckqueue(128);
 
 CCriticalSection cs_setpwalletRegistered;
 set<CWallet*> setpwalletRegistered;
@@ -2245,6 +2253,9 @@ bool CBlock::DisconnectBlock(CTxDB& txdb, CBlockIndex* pindex)
 // current block under processing
 bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
 {
+const CBlockIndex* pindexBlock = pindex; // Use the block index passed to ConnectBlock
+bool fBlock = true;                     // We are validating as part of a block
+bool fMiner = false;                    // Not during mining
     // Check it again in case a previous version let a bad block in
     if (!CheckBlock(!fJustCheck, !fJustCheck))
         return false;
@@ -2279,6 +2290,12 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
     int64 nValueOut = 0;
     int64 nStakeReward = 0;
     unsigned int nSigOps = 0;
+
+    // --------- Begin parallel script verification section ---------
+    std::vector<CScriptCheck> vChecks;
+    unsigned int flags = 0; // No script verification flags in 0.6.3/Magi
+    // -------------------------------------------------------------
+
     BOOST_FOREACH(CTransaction& tx, vtx)
     {
         uint256 hashTx = tx.GetHash();
@@ -2328,34 +2345,49 @@ bool CBlock::ConnectBlock(CTxDB& txdb, CBlockIndex* pindex, bool fJustCheck)
             if (tx.IsCoinStake())
                 nStakeReward = nTxValueOut - nTxValueIn;
 
-            if (!tx.ConnectInputs(txdb, mapInputs, mapQueuedChanges, posThisTx, pindex, true, false, fStrictPayToScriptHash))
+            // --------- Collect script checks ----------
+			std::map<uint256, CTxIndex> mapTestPool;
+            if (!tx.ConnectInputs(txdb, mapInputs, mapTestPool, posThisTx, pindexBlock, fBlock, fMiner))
                 return false;
+            // ------------------------------------------
+            // Remove the line below if it exists:
+            // if (!tx.ConnectInputs(txdb, mapInputs, mapQueuedChanges, posThisTx, pindex, true, false, fStrictPayToScriptHash))
+            //     return false;
         }
 
         mapQueuedChanges[hashTx] = CTxIndex(posThisTx, tx.vout.size());
     }
 
+    // --------- Run script checks in parallel ---------
+    {
+        CCheckQueueControl<CScriptCheck> control(&scriptcheckqueue);
+        scriptcheckqueue.Add(vChecks);
+        if (!scriptcheckqueue.Wait())
+            return false;
+    }
+    // ------------------------------------------------
 
     if (IsProofOfWork()) // the block under processing is PoW
     {
 //	const CBlockIndex* pIndex0 = GetLastPoWBlockIndex(pindex); // find the nearest PoW block
 //        int64 nPoWReward = GetProofOfWorkReward(pindex->pprev->nBits, pindex->pprev->nHeight, nFees);
         int64 nPoWReward = (IsPoWIIRewardProtocolV2(pindex->pprev->nTime)) ? 
-			    GetProofOfWorkRewardV2(pindex->pprev, nFees, true) : 
-			    GetProofOfWorkReward(pindex->pprev->nBits, pindex->pprev->nHeight, nFees);
 	// Check coinbase reward
+                GetProofOfWorkRewardV2(pindex->pprev, nFees, true) : 
+                GetProofOfWorkReward(pindex->pprev->nBits, pindex->pprev->nHeight, nFees);
         if (vtx[0].GetValueOut() > nPoWReward)
             return DoS(50, error("ConnectBlock() : coinbase reward exceeded (actual=%" PRI64d " vs calculated=%" PRI64d ", height=%i)",
                    vtx[0].GetValueOut(),
                    nPoWReward,
-		   pindex->pprev->nHeight));
+
+                   pindex->pprev->nHeight));
     }
 
     if (IsProofOfStake()) // the block under processing is PoS
     {
         // ppcoin: coin stake tx earns reward instead of paying fee
         uint64 nCoinAge;
-	bool fTxGetCoinAge = (IsPoSIIProtocolV2(pindex->nHeight)) ? vtx[1].GetCoinAgeV2(txdb, nCoinAge) : vtx[1].GetCoinAge(txdb, nCoinAge);
+        bool fTxGetCoinAge = (IsPoSIIProtocolV2(pindex->nHeight)) ? vtx[1].GetCoinAgeV2(txdb, nCoinAge) : vtx[1].GetCoinAge(txdb, nCoinAge);
         if (!fTxGetCoinAge)
             return error("ConnectBlock() : %s unable to get coin age for coinstake", vtx[1].GetHash().ToString().substr(0,10).c_str());
 //	const CBlockIndex* pIndex0 = GetLastPoSBlockIndex(pindex); // find the nearest PoS block
@@ -5504,3 +5536,51 @@ void GenerateMagi(bool fGenerate, CWallet* pwallet)
         }
     }
 }
+
+/*
+bool CTransaction::ConnectInputs(
+    CTxDB& txdb,
+    MapPrevTx inputs,
+    std::map<uint256, CTxIndex>& mapTestPool,
+    const CDiskTxPos& posThisTx,
+    const CBlockIndex* pindexBlock,
+    bool fBlock,
+    bool fMiner
+) const
+{
+    if (IsCoinBase())
+        return true; // Coinbase has no inputs to check
+
+    for (unsigned int i = 0; i < vin.size(); i++)
+    {
+        const COutPoint& prevout = vin[i].prevout;
+        map<uint256, CTxIndex>::iterator mi = mapInputs.find(prevout.hash);
+        if (mi == mapInputs.end())
+            return error("ConnectInputs() : prev tx not found");
+
+        CTxIndex& txindex = mi->second;
+        CTransaction txPrev;
+        if (!txPrev.ReadFromDisk(txindex.pos))
+            return error("ConnectInputs() : ReadFromDisk prev tx failed");
+
+        if (prevout.n >= txPrev.vout.size())
+            return error("ConnectInputs() : prevout.n out of range");
+
+        const CTxOut& prev = txPrev.vout[prevout.n];
+
+        // Script verification (serial, as in 0.6.3)
+        if (!VerifyScript(
+            vin[i].scriptSig,
+            prev.scriptPubKey,
+            *this,
+            i,
+            0 // nFlags (set as needed)
+        )) {
+            return error("ConnectInputs() : VerifyScript failed");
+        }
+
+        // Add fee calculation and spent-marking as needed for your logic
+    }
+    return true;
+}
+*/

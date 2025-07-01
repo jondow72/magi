@@ -187,6 +187,8 @@ HEADERS += \
     src/qt/addressbookpage.h \
     src/qt/signverifymessagedialog.h \
     src/qt/editaddressdialog.h \
+    src/scriptcheck.h \
+    src/checkqueue.h \
     src/alert.h \
     src/addrman.h \
     src/base58.h \
@@ -279,6 +281,7 @@ SOURCES += \
     src/qt/signverifymessagedialog.cpp \
     src/qt/editaddressdialog.cpp \
     src/qt/trafficgraphwidget.cpp \
+    src/scriptcheck.cpp \
     src/alert.cpp \
     src/sync.cpp \
     src/util.cpp \
