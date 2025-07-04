@@ -243,6 +243,7 @@ HEADERS += \
     src/qt/qvalidatedlineedit.h \
     src/qt/qvaluecombobox.h \
     src/qt/askpassphrasedialog.h \
+    src/qt/trafficgraphwidget.h \
     src/protocol.h \
     src/qt/notificator.h \
     src/qt/qtipcserver.h \
@@ -278,6 +279,7 @@ SOURCES += \
     src/qt/addressbookpage.cpp \
     src/qt/signverifymessagedialog.cpp \
     src/qt/editaddressdialog.cpp \
+    src/qt/trafficgraphwidget.cpp \
     src/alert.cpp \
     src/sync.cpp \
     src/util.cpp \
