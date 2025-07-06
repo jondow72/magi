@@ -79,8 +79,8 @@ int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned ch
     if (!BN_copy(x, order)) { ret = -1; goto err; }
     if (!BN_mul_word(x, i)) { ret = -1; goto err; }
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
-    ECDSA_SIG_get0_r(ecsig, &r);
-    ECDSA_SIG_get0_s(ecsig, &s);
+    r = ECDSA_SIG_get0_r(ecsig); // Corrected for OpenSSL 3.0+
+    s = ECDSA_SIG_get0_s(ecsig); // Corrected for OpenSSL 3.0+
 #else
     ECDSA_SIG_get0(ecsig, &r, &s);
 #endif
@@ -150,8 +150,8 @@ bool CKey::SignCompact(uint256 hash, std::vector<unsigned char>& vchSig)
     const BIGNUM *r = NULL;
     const BIGNUM *s = NULL;
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
-    ECDSA_SIG_get0_r(sig, &r);
-    ECDSA_SIG_get0_s(sig, &s);
+    r = ECDSA_SIG_get0_r(sig); // Corrected for OpenSSL 3.0+
+    s = ECDSA_SIG_get0_s(sig); // Corrected for OpenSSL 3.0+
 #else
     ECDSA_SIG_get0(sig, &r, &s);
 #endif
