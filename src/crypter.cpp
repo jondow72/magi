@@ -4,6 +4,7 @@
 
 #include <openssl/aes.h>
 #include <openssl/evp.h>
+#include <openssl/kdf.h> // For EVP_KDF in OpenSSL 3.0+
 #include <vector>
 #include <string>
 #ifdef WIN32
@@ -18,9 +19,32 @@ bool CCrypter::SetKeyFromPassphrase(const SecureString& strKeyData, const std::v
         return false;
 
     int i = 0;
-    if (nDerivationMethod == 0)
-        i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha512(), &chSalt[0],
-                          (unsigned char *)&strKeyData[0], strKeyData.size(), nRounds, chKey, chIV);
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+    i = EVP_BytesToKey(EVP_aes_256_cbc(), EVP_sha512(), &chSalt[0],
+                       (unsigned char *)&strKeyData[0], strKeyData.size(), nRounds, chKey, chIV);
+#else
+    EVP_KDF* kdf = EVP_KDF_fetch(NULL, "PBKDF2", NULL);
+    if (!kdf) {
+        return false;
+    }
+    EVP_KDF_CTX* kctx = EVP_KDF_CTX_new(kdf);
+    EVP_KDF_free(kdf);
+    if (!kctx) {
+        return false;
+    }
+    unsigned char derived[WALLET_CRYPTO_KEY_SIZE + WALLET_CRYPTO_KEY_SIZE];
+    size_t derived_len = sizeof(derived);
+    if (EVP_KDF_CTX_set_kdf_pbkdf2_rounds(kctx, nRounds) <= 0 ||
+        EVP_KDF_CTX_set_kdf_pbkdf2_salt(kctx, &chSalt[0], chSalt.size()) <= 0 ||
+        EVP_KDF_derive(kctx, derived, derived_len, EVP_sha512()) <= 0) {
+        EVP_KDF_CTX_free(kctx);
+        return false;
+    }
+    EVP_KDF_CTX_free(kctx);
+    memcpy(chKey, derived, WALLET_CRYPTO_KEY_SIZE);
+    memcpy(chIV, derived + WALLET_CRYPTO_KEY_SIZE, WALLET_CRYPTO_KEY_SIZE);
+    i = WALLET_CRYPTO_KEY_SIZE;
+#endif
 
     if (i != (int)WALLET_CRYPTO_KEY_SIZE)
     {
@@ -50,21 +74,31 @@ bool CCrypter::Encrypt(const CKeyingMaterial& vchPlaintext, std::vector<unsigned
     if (!fKeySet)
         return false;
 
-    // max ciphertext len for a n bytes of plaintext is
-    // n + AES_BLOCK_SIZE - 1 bytes
     int nLen = vchPlaintext.size();
     int nCLen = nLen + AES_BLOCK_SIZE, nFLen = 0;
     vchCiphertext = std::vector<unsigned char> (nCLen);
 
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
     EVP_CIPHER_CTX ctx;
+    EVP_CIPHER_CTX_init(&ctx);
+#else
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        return false;
+    }
+#endif
 
     bool fOk = true;
 
-    EVP_CIPHER_CTX_init(&ctx);
-    if (fOk) fOk = EVP_EncryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, chKey, chIV);
-    if (fOk) fOk = EVP_EncryptUpdate(&ctx, &vchCiphertext[0], &nCLen, &vchPlaintext[0], nLen);
-    if (fOk) fOk = EVP_EncryptFinal_ex(&ctx, (&vchCiphertext[0])+nCLen, &nFLen);
+    if (fOk) fOk = EVP_EncryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, chKey, chIV);
+    if (fOk) fOk = EVP_EncryptUpdate(ctx, &vchCiphertext[0], &nCLen, &vchPlaintext[0], nLen);
+    if (fOk) fOk = EVP_EncryptFinal_ex(ctx, (&vchCiphertext[0])+nCLen, &nFLen);
+
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
     EVP_CIPHER_CTX_cleanup(&ctx);
+#else
+    EVP_CIPHER_CTX_free(ctx);
+#endif
 
     if (!fOk) return false;
 
@@ -77,28 +111,38 @@ bool CCrypter::Decrypt(const std::vector<unsigned char>& vchCiphertext, CKeyingM
     if (!fKeySet)
         return false;
 
-    // plaintext will always be equal to or lesser than length of ciphertext
     int nLen = vchCiphertext.size();
     int nPLen = nLen, nFLen = 0;
 
     vchPlaintext = CKeyingMaterial(nPLen);
 
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
     EVP_CIPHER_CTX ctx;
+    EVP_CIPHER_CTX_init(&ctx);
+#else
+    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
+    if (!ctx) {
+        return false;
+    }
+#endif
 
     bool fOk = true;
 
-    EVP_CIPHER_CTX_init(&ctx);
-    if (fOk) fOk = EVP_DecryptInit_ex(&ctx, EVP_aes_256_cbc(), NULL, chKey, chIV);
-    if (fOk) fOk = EVP_DecryptUpdate(&ctx, &vchPlaintext[0], &nPLen, &vchCiphertext[0], nLen);
-    if (fOk) fOk = EVP_DecryptFinal_ex(&ctx, (&vchPlaintext[0])+nPLen, &nFLen);
+    if (fOk) fOk = EVP_DecryptInit_ex(ctx, EVP_aes_256_cbc(), NULL, chKey, chIV);
+    if (fOk) fOk = EVP_DecryptUpdate(ctx, &vchPlaintext[0], &nPLen, &vchCiphertext[0], nLen);
+    if (fOk) fOk = EVP_DecryptFinal_ex(ctx, (&vchPlaintext[0])+nPLen, &nFLen);
+
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
     EVP_CIPHER_CTX_cleanup(&ctx);
+#else
+    EVP_CIPHER_CTX_free(ctx);
+#endif
 
     if (!fOk) return false;
 
     vchPlaintext.resize(nPLen + nFLen);
     return true;
 }
-
 
 bool EncryptSecret(CKeyingMaterial& vMasterKey, const CSecret &vchPlaintext, const uint256& nIV, std::vector<unsigned char> &vchCiphertext)
 {
