@@ -4,11 +4,18 @@
 #define PBKDF2_H
 
 #include <openssl/sha.h>
+#include <openssl/evp.h> // Added for EVP API
 #include <stdint.h>
 
 typedef struct HMAC_SHA256Context {
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
     SHA256_CTX ictx;
     SHA256_CTX octx;
+#else
+    EVP_MD_CTX* ictx;
+    EVP_MD_CTX* octx;
+#endif
+
 } HMAC_SHA256_CTX;
 
 void

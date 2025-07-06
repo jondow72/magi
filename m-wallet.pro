@@ -200,7 +200,6 @@ HEADERS += \
     src/uint256.h \
     src/kernel.h \
     src/scrypt_mine.h \
-    src/pbkdf2.h \
     src/serialize.h \
     src/main.h \
     src/net.h \
@@ -327,7 +326,6 @@ SOURCES += \
     src/qt/rpcconsole.cpp \
     src/noui.cpp \
     src/kernel.cpp \
-    src/pbkdf2.cpp \
     src/hash/keccak.cpp \
     src/hash/haval.cpp \
     src/hash/ripemd.cpp \
