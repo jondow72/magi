@@ -175,6 +175,14 @@ QMAKE_CXXFLAGS_WARN_ON = -fdiagnostics-show-option -Wall -Wextra -Wformat -Wform
 # Input
 DEPENDPATH += src src/json src/qt
 HEADERS += \
+    src/crypto/common.h \
+    src/crypto/sha256.h \
+    src/crypto/sha512.h \
+    src/crypto/hmac_sha256.h \
+    src/crypto/rfc6979_hmac_sha256.h \
+    src/crypto/hmac_sha512.h \
+    src/crypto/sha1.h \
+    src/crypto/ripemd160.h \
     src/qt/transactiontablemodel.h \
     src/qt/addresstablemodel.h \
     src/qt/optionsdialog.h \
@@ -187,7 +195,6 @@ HEADERS += \
     src/alert.h \
     src/addrman.h \
     src/base58.h \
-    src/bignum.h \
     src/checkpoints.h \
     src/compat.h \
     src/coincontrol.h \
@@ -266,6 +273,13 @@ HEADERS += \
     src/qt/utilitydialog.h
 
 SOURCES += \
+    src/crypto/sha1.cpp \
+    src/crypto/sha256.cpp \
+    src/crypto/sha512.cpp \
+    src/crypto/hmac_sha256.cpp \
+    src/crypto/rfc6979_hmac_sha256.cpp \
+    src/crypto/hmac_sha512.cpp \
+    src/crypto/ripemd160.cpp \
     src/qt/transactiontablemodel.cpp \
     src/qt/addresstablemodel.cpp \
     src/qt/optionsdialog.cpp \
@@ -287,6 +301,7 @@ SOURCES += \
     src/net.cpp \
     src/checkpoints.cpp \
     src/addrman.cpp \
+    src/base58.cpp \
     src/db.cpp \
     src/walletdb.cpp \
     src/magimath.cpp \
