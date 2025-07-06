@@ -3,10 +3,10 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <map>
-
 #include <openssl/ecdsa.h>
 #include <openssl/obj_mac.h>
-
+#include <openssl/bn.h>
+#include <openssl/ec.h>
 #include "key.h"
 
 // Generate a private key from just the secret parameter
@@ -31,31 +31,29 @@ int EC_KEY_regenerate_key(EC_KEY *eckey, BIGNUM *priv_key)
     if (!EC_POINT_mul(group, pub_key, priv_key, NULL, NULL, ctx))
         goto err;
 
-    EC_KEY_set_private_key(eckey,priv_key);
-    EC_KEY_set_public_key(eckey,pub_key);
+    if (!EC_KEY_set_private_key(eckey, priv_key))
+        goto err;
+    if (!EC_KEY_set_public_key(eckey, pub_key))
+        goto err;
 
     ok = 1;
 
 err:
-
     if (pub_key)
         EC_POINT_free(pub_key);
     if (ctx != NULL)
         BN_CTX_free(ctx);
 
-    return(ok);
+    return ok;
 }
 
-// Perform ECDSA key recovery (see SEC1 4.1.6) for curves over (mod p)-fields
-// recid selects which key is recovered
-// if check is non-zero, additional checks are performed
+// Perform ECDSA key recovery for curves over (mod p)-fields
 int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned char *msg, int msglen, int recid, int check)
 {
     if (!eckey) return 0;
 
     int ret = 0;
     BN_CTX *ctx = NULL;
-
     BIGNUM *x = NULL;
     BIGNUM *e = NULL;
     BIGNUM *order = NULL;
@@ -67,7 +65,8 @@ int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned ch
     EC_POINT *Q = NULL;
     BIGNUM *rr = NULL;
     BIGNUM *zero = NULL;
-    BIGNUM *s = 0;
+    const BIGNUM *r = NULL;
+    const BIGNUM *s = NULL;
     int n = 0;
     int i = recid / 2;
 
@@ -77,39 +76,54 @@ int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned ch
     order = BN_CTX_get(ctx);
     if (!EC_GROUP_get_order(group, order, ctx)) { ret = -2; goto err; }
     x = BN_CTX_get(ctx);
-    if (!BN_copy(x, order)) { ret=-1; goto err; }
-    if (!BN_mul_word(x, i)) { ret=-1; goto err; }
-    ECDSA_SIG_get0(ecsig, (const BIGNUM **)&s, 0);
-    if (!BN_add(x, x, s)) { ret=-1; goto err; }
+    if (!BN_copy(x, order)) { ret = -1; goto err; }
+    if (!BN_mul_word(x, i)) { ret = -1; goto err; }
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    ECDSA_SIG_get0_r(ecsig, &r);
+    ECDSA_SIG_get0_s(ecsig, &s);
+#else
+    ECDSA_SIG_get0(ecsig, &r, &s);
+#endif
+    if (!BN_add(x, x, r)) { ret = -1; goto err; }
     field = BN_CTX_get(ctx);
-    if (!EC_GROUP_get_curve_GFp(group, field, NULL, NULL, ctx)) { ret=-2; goto err; }
-    if (BN_cmp(x, field) >= 0) { ret=0; goto err; }
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (!EC_GROUP_get_curve(group, field, NULL, NULL, ctx)) { ret = -2; goto err; }
+#else
+    if (!EC_GROUP_get_curve_GFp(group, field, NULL, NULL, ctx)) { ret = -2; goto err; }
+#endif
+    if (BN_cmp(x, field) >= 0) { ret = 0; goto err; }
     if ((R = EC_POINT_new(group)) == NULL) { ret = -2; goto err; }
-    if (!EC_POINT_set_compressed_coordinates_GFp(group, R, x, recid % 2, ctx)) { ret=0; goto err; }
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (!EC_POINT_set_compressed_coordinates(group, R, x, recid % 2, ctx)) { ret = 0; goto err; }
+#else
+    if (!EC_POINT_set_compressed_coordinates_GFp(group, R, x, recid % 2, ctx)) { ret = 0; goto err; }
+#endif
     if (check)
     {
         if ((O = EC_POINT_new(group)) == NULL) { ret = -2; goto err; }
-        if (!EC_POINT_mul(group, O, NULL, R, order, ctx)) { ret=-2; goto err; }
+        if (!EC_POINT_mul(group, O, NULL, R, order, ctx)) { ret = -2; goto err; }
         if (!EC_POINT_is_at_infinity(group, O)) { ret = 0; goto err; }
     }
     if ((Q = EC_POINT_new(group)) == NULL) { ret = -2; goto err; }
     n = EC_GROUP_get_degree(group);
     e = BN_CTX_get(ctx);
-    if (!BN_bin2bn(msg, msglen, e)) { ret=-1; goto err; }
-    if (8*msglen > n) BN_rshift(e, e, 8-(n & 7));
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    if (!BN_lebin2bn(msg, msglen, e)) { ret = -1; goto err; }
+#else
+    if (!BN_bin2bn(msg, msglen, e)) { ret = -1; goto err; }
+#endif
+    if (8 * msglen > n) BN_rshift(e, e, 8 - (n & 7));
     zero = BN_CTX_get(ctx);
-    if (!BN_set_word(zero, 0)) { ret=-1; goto err; }
-    if (!BN_mod_sub(e, zero, e, order, ctx)) { ret=-1; goto err; }
+    if (!BN_set_word(zero, 0)) { ret = -1; goto err; }
+    if (!BN_mod_sub(e, zero, e, order, ctx)) { ret = -1; goto err; }
     rr = BN_CTX_get(ctx);
-    ECDSA_SIG_get0(ecsig, (const BIGNUM **)&s, 0);
-    if (!BN_mod_inverse(rr, s, order, ctx)) { ret=-1; goto err; }
+    if (!BN_mod_inverse(rr, r, order, ctx)) { ret = -1; goto err; }
     sor = BN_CTX_get(ctx);
-    ECDSA_SIG_get0(ecsig, 0, (const BIGNUM **)&s);
-    if (!BN_mod_mul(sor, s, rr, order, ctx)) { ret=-1; goto err; }
+    if (!BN_mod_mul(sor, s, rr, order, ctx)) { ret = -1; goto err; }
     eor = BN_CTX_get(ctx);
-    if (!BN_mod_mul(eor, e, rr, order, ctx)) { ret=-1; goto err; }
-    if (!EC_POINT_mul(group, Q, eor, R, sor, ctx)) { ret=-2; goto err; }
-    if (!EC_KEY_set_public_key(eckey, Q)) { ret=-2; goto err; }
+    if (!BN_mod_mul(eor, e, rr, order, ctx)) { ret = -1; goto err; }
+    if (!EC_POINT_mul(group, Q, eor, R, sor, ctx)) { ret = -2; goto err; }
+    if (!EC_KEY_set_public_key(eckey, Q)) { ret = -2; goto err; }
 
     ret = 1;
 
@@ -122,6 +136,106 @@ err:
     if (O != NULL) EC_POINT_free(O);
     if (Q != NULL) EC_POINT_free(Q);
     return ret;
+}
+
+// Create a compact signature (65 bytes)
+bool CKey::SignCompact(uint256 hash, std::vector<unsigned char>& vchSig)
+{
+    bool fOk = false;
+    ECDSA_SIG *sig = ECDSA_do_sign((unsigned char*)&hash, sizeof(hash), pkey);
+    if (sig == NULL)
+        return false;
+    vchSig.clear();
+    vchSig.resize(65, 0);
+    const BIGNUM *r = NULL;
+    const BIGNUM *s = NULL;
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    ECDSA_SIG_get0_r(sig, &r);
+    ECDSA_SIG_get0_s(sig, &s);
+#else
+    ECDSA_SIG_get0(sig, &r, &s);
+#endif
+    int nBitsR = BN_num_bits(r);
+    int nBitsS = BN_num_bits(s);
+    if (nBitsR <= 256 && nBitsS <= 256)
+    {
+        int nRecId = -1;
+        for (int i = 0; i < 4; i++)
+        {
+            CKey keyRec;
+            keyRec.fSet = true;
+            if (fCompressedPubKey)
+                keyRec.SetCompressedPubKey();
+            if (ECDSA_SIG_recover_key_GFp(keyRec.pkey, sig, (unsigned char*)&hash, sizeof(hash), i, 1) == 1)
+                if (keyRec.GetPubKey() == this->GetPubKey())
+                {
+                    nRecId = i;
+                    break;
+                }
+        }
+
+        if (nRecId == -1)
+            throw key_error("CKey::SignCompact() : unable to construct recoverable key");
+
+        vchSig[0] = nRecId + 27 + (fCompressedPubKey ? 4 : 0);
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+        BN_bn2lebinpad(r, &vchSig[33 - (nBitsR + 7) / 8], 32);
+        BN_bn2lebinpad(s, &vchSig[65 - (nBitsS + 7) / 8], 32);
+#else
+        BN_bn2bin(r, &vchSig[33 - (nBitsR + 7) / 8]);
+        BN_bn2bin(s, &vchSig[65 - (nBitsS + 7) / 8]);
+#endif
+        fOk = true;
+    }
+    ECDSA_SIG_free(sig);
+    return fOk;
+}
+
+// Reconstruct public key from a compact signature
+bool CKey::SetCompactSignature(uint256 hash, const std::vector<unsigned char>& vchSig)
+{
+    if (vchSig.size() != 65)
+        return false;
+    int nV = vchSig[0];
+    if (nV < 27 || nV >= 35)
+        return false;
+    ECDSA_SIG *sig = ECDSA_SIG_new();
+    BIGNUM *r = BN_new();
+    BIGNUM *s = BN_new();
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    if (!BN_lebin2bn(&vchSig[1], 32, r) || !BN_lebin2bn(&vchSig[33], 32, s))
+#else
+    if (!BN_bin2bn(&vchSig[1], 32, r) || !BN_bin2bn(&vchSig[33], 32, s))
+#endif
+    {
+        ECDSA_SIG_free(sig);
+        BN_free(r);
+        BN_free(s);
+        return false;
+    }
+    if (!ECDSA_SIG_set0(sig, r, s))
+    {
+        ECDSA_SIG_free(sig);
+        BN_free(r);
+        BN_free(s);
+        return false;
+    }
+
+    EC_KEY_free(pkey);
+    pkey = EC_KEY_new_by_curve_name(NID_secp256k1);
+    if (nV >= 31)
+    {
+        SetCompressedPubKey();
+        nV -= 4;
+    }
+    if (ECDSA_SIG_recover_key_GFp(pkey, sig, (unsigned char*)&hash, sizeof(hash), nV - 27, 0) == 1)
+    {
+        fSet = true;
+        ECDSA_SIG_free(sig);
+        return true;
+    }
+    ECDSA_SIG_free(sig);
+    return false;
 }
 
 void CKey::SetCompressedPubKey()
@@ -192,19 +306,12 @@ bool CKey::SetPrivKey(const CPrivKey& vchPrivKey)
     const unsigned char* pbegin = &vchPrivKey[0];
     if (d2i_ECPrivateKey(&pkey, &pbegin, vchPrivKey.size()))
     {
-        // In testing, d2i_ECPrivateKey can return true
-        // but fill in pkey with a key that fails
-        // EC_KEY_check_key, so:
         if (EC_KEY_check_key(pkey))
         {
             fSet = true;
             return true;
         }
     }
-    // If vchPrivKey data is bad d2i_ECPrivateKey() can
-    // leave pkey in a state where calling EC_KEY_free()
-    // crashes. To avoid that, set pkey to NULL and
-    // leak the memory (a leak is better than a crash)
     pkey = NULL;
     Reset();
     return false;
@@ -218,10 +325,14 @@ bool CKey::SetSecret(const CSecret& vchSecret, bool fCompressed)
         throw key_error("CKey::SetSecret() : EC_KEY_new_by_curve_name failed");
     if (vchSecret.size() != 32)
         throw key_error("CKey::SetSecret() : secret must be 32 bytes");
-    BIGNUM *bn = BN_bin2bn(&vchSecret[0],32,BN_new());
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    BIGNUM *bn = BN_lebin2bn(&vchSecret[0], 32, BN_new());
+#else
+    BIGNUM *bn = BN_bin2bn(&vchSecret[0], 32, BN_new());
+#endif
     if (bn == NULL)
         throw key_error("CKey::SetSecret() : BN_bin2bn failed");
-    if (!EC_KEY_regenerate_key(pkey,bn))
+    if (!EC_KEY_regenerate_key(pkey, bn))
     {
         BN_clear_free(bn);
         throw key_error("CKey::SetSecret() : EC_KEY_regenerate_key failed");
@@ -241,8 +352,12 @@ CSecret CKey::GetSecret(bool &fCompressed) const
     int nBytes = BN_num_bytes(bn);
     if (bn == NULL)
         throw key_error("CKey::GetSecret() : EC_KEY_get0_private_key failed");
-    int n=BN_bn2bin(bn,&vchRet[32 - nBytes]);
-    if (n != nBytes)
+#if OPENSSL_VERSION_NUMBER >= 0x10100000L
+    int n = BN_bn2lebinpad(bn, &vchRet[0], 32);
+#else
+    int n = BN_bn2bin(bn, &vchRet[32 - nBytes]);
+#endif
+    if (n != 32)
         throw key_error("CKey::GetSecret(): BN_bn2bin failed");
     fCompressed = fCompressedPubKey;
     return vchRet;
@@ -290,103 +405,20 @@ CPubKey CKey::GetPubKey() const
 bool CKey::Sign(uint256 hash, std::vector<unsigned char>& vchSig)
 {
     unsigned int nSize = ECDSA_size(pkey);
-    vchSig.resize(nSize); // Make sure it is big enough
+    vchSig.resize(nSize);
     if (!ECDSA_sign(0, (unsigned char*)&hash, sizeof(hash), &vchSig[0], &nSize, pkey))
     {
         vchSig.clear();
         return false;
     }
-    vchSig.resize(nSize); // Shrink to fit actual size
+    vchSig.resize(nSize);
     return true;
-}
-
-// create a compact signature (65 bytes), which allows reconstructing the used public key
-// The format is one header byte, followed by two times 32 bytes for the serialized r and s values.
-// The header byte: 0x1B = first key with even y, 0x1C = first key with odd y,
-//                  0x1D = second key with even y, 0x1E = second key with odd y
-bool CKey::SignCompact(uint256 hash, std::vector<unsigned char>& vchSig)
-{
-    bool fOk = false;
-    BIGNUM *s = 0;
-    BIGNUM *r = 0;
-    ECDSA_SIG *sig = ECDSA_do_sign((unsigned char*)&hash, sizeof(hash), pkey);
-    if (sig==NULL)
-        return false;
-    vchSig.clear();
-    vchSig.resize(65,0);
-    ECDSA_SIG_get0(sig, (const BIGNUM **)&r, (const BIGNUM **)&s);
-    int nBitsR = BN_num_bits(r);
-    int nBitsS = BN_num_bits(s);
-    if (nBitsR <= 256 && nBitsS <= 256)
-    {
-        int nRecId = -1;
-        for (int i=0; i<4; i++)
-        {
-            CKey keyRec;
-            keyRec.fSet = true;
-            if (fCompressedPubKey)
-                keyRec.SetCompressedPubKey();
-            if (ECDSA_SIG_recover_key_GFp(keyRec.pkey, sig, (unsigned char*)&hash, sizeof(hash), i, 1) == 1)
-                if (keyRec.GetPubKey() == this->GetPubKey())
-                {
-                    nRecId = i;
-                    break;
-                }
-        }
-
-        if (nRecId == -1)
-            throw key_error("CKey::SignCompact() : unable to construct recoverable key");
-
-        vchSig[0] = nRecId+27+(fCompressedPubKey ? 4 : 0);
-        ECDSA_SIG_get0(sig, (const BIGNUM **)&r, (const BIGNUM **)&s);
-        BN_bn2bin(r,&vchSig[33-(nBitsR+7)/8]);
-        BN_bn2bin(s,&vchSig[65-(nBitsS+7)/8]);
-        fOk = true;
-    }
-    ECDSA_SIG_free(sig);
-    return fOk;
-}
-
-// reconstruct public key from a compact signature
-// This is only slightly more CPU intensive than just verifying it.
-// If this function succeeds, the recovered public key is guaranteed to be valid
-// (the signature is a valid signature of the given data for that key)
-bool CKey::SetCompactSignature(uint256 hash, const std::vector<unsigned char>& vchSig)
-{
-    BIGNUM *s = 0;
-    BIGNUM *r = 0;
-    if (vchSig.size() != 65)
-        return false;
-    int nV = vchSig[0];
-    if (nV<27 || nV>=35)
-        return false;
-    ECDSA_SIG *sig = ECDSA_SIG_new();
-    ECDSA_SIG_get0(sig, (const BIGNUM **)&r, (const BIGNUM **)&s);
-    BN_bin2bn(&vchSig[1],32,r);
-    BN_bin2bn(&vchSig[33],32,s);
-
-    EC_KEY_free(pkey);
-    pkey = EC_KEY_new_by_curve_name(NID_secp256k1);
-    if (nV >= 31)
-    {
-        SetCompressedPubKey();
-        nV -= 4;
-    }
-    if (ECDSA_SIG_recover_key_GFp(pkey, sig, (unsigned char*)&hash, sizeof(hash), nV - 27, 0) == 1)
-    {
-        fSet = true;
-        ECDSA_SIG_free(sig);
-        return true;
-    }
-    return false;
 }
 
 bool CKey::Verify(uint256 hash, const std::vector<unsigned char>& vchSig)
 {
-    // -1 = error, 0 = bad sig, 1 = good
     if (ECDSA_verify(0, (unsigned char*)&hash, sizeof(hash), &vchSig[0], vchSig.size(), pkey) != 1)
         return false;
-
     return true;
 }
 
@@ -397,7 +429,6 @@ bool CKey::VerifyCompact(uint256 hash, const std::vector<unsigned char>& vchSig)
         return false;
     if (GetPubKey() != key.GetPubKey())
         return false;
-
     return true;
 }
 
@@ -405,10 +436,8 @@ bool CKey::IsValid()
 {
     if (!fSet)
         return false;
-
     if (!EC_KEY_check_key(pkey))
         return false;
-
     bool fCompr;
     CSecret secret = GetSecret(fCompr);
     CKey key2;
@@ -417,11 +446,11 @@ bool CKey::IsValid()
 }
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
-    void ECDSA_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr, const BIGNUM **ps)
-    {
-        if (pr != NULL)
-            *pr = sig->r;
-        if (ps != NULL)
-            *ps = sig->s;
-    }
+void ECDSA_SIG_get0(const ECDSA_SIG *sig, const BIGNUM **pr, const BIGNUM **ps)
+{
+    if (pr != NULL)
+        *pr = sig->r;
+    if (ps != NULL)
+        *ps = sig->s;
+}
 #endif
