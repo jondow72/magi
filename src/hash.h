@@ -273,7 +273,23 @@ inline uint160 Hash160(const std::vector<unsigned char>& vch)
     EVP_MD_CTX_free(ctx);
 #endif
     uint160 hash2;
-    RIPEMD160((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2);
+#if OPENSSL_VERSION_NUMBER < 0x30000000L
+    if (!RIPEMD160((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2)) {
+        throw std::runtime_error("RIPEMD160 failed");
+    }
+#else
+    ctx = EVP_MD_CTX_new();
+    if (!ctx) {
+        throw std::runtime_error("EVP_MD_CTX_new failed");
+    }
+    if (!EVP_DigestInit_ex(ctx, EVP_ripemd160(), NULL) ||
+        !EVP_DigestUpdate(ctx, (unsigned char*)&hash1, sizeof(hash1)) ||
+        !EVP_DigestFinal_ex(ctx, (unsigned char*)&hash2, NULL)) {
+        EVP_MD_CTX_free(ctx);
+        throw std::runtime_error("EVP_Digest failed");
+    }
+    EVP_MD_CTX_free(ctx);
+#endif
     return hash2;
 }
 
