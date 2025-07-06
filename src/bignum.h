@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <vector>
 #include <openssl/bn.h>
+#include <openssl/evp.h> // For canonical DER handling in OpenSSL 3.0+
 
 #include "util.h" // for uint64
 
@@ -17,7 +18,6 @@ class bignum_error : public std::runtime_error
 public:
     explicit bignum_error(const std::string& str) : std::runtime_error(str) {}
 };
-
 
 /** RAII encapsulated BN_CTX (OpenSSL bignum context) */
 class CAutoBN_CTX
@@ -45,7 +45,6 @@ public:
     BN_CTX** operator&() { return &pctx; }
     bool operator!() { return (pctx == NULL); }
 };
-
 
 /** C++ wrapper for BIGNUM (OpenSSL bignum) */
 class CBigNum : public BIGNUM
@@ -78,7 +77,6 @@ public:
         BN_clear_free(this);
     }
 
-    //CBigNum(char n) is not portable.  Use 'signed char' or 'unsigned char'.
     CBigNum(signed char n)      { BN_init(this); if (n >= 0) setulong(n); else setint64(n); }
     CBigNum(short n)            { BN_init(this); if (n >= 0) setulong(n); else setint64(n); }
     CBigNum(int n)              { BN_init(this); if (n >= 0) setulong(n); else setint64(n); }
@@ -117,7 +115,9 @@ public:
     {
         unsigned long n = BN_get_word(this);
         if (!BN_is_negative(this))
-            return (n > (unsigned long)std::numeric_limits<int>::max() ? std::numeric_limits<int>::max() : n);
+            return (
+
+n > (unsigned long)std::numeric_limits<int>::max() ? std::numeric_limits<int>::max() : n);
         else
             return (n > (unsigned long)std::numeric_limits<int>::max() ? std::numeric_limits<int>::min() : -(int)n);
     }
@@ -131,7 +131,6 @@ public:
 
         if (sn < (int64)0)
         {
-            // Since the minimum signed integer cannot be represented as positive so long as its type is signed, and it's not well-defined what happens if you make it unsigned before negating it, we instead increment the negative integer by 1, convert it, then increment the (now positive) unsigned integer by 1 to compensate
             n = -(sn + 1);
             ++n;
             fNegative = true;
@@ -250,18 +249,14 @@ public:
         return n;
     }
 
-
     void setvch(const std::vector<unsigned char>& vch)
     {
         std::vector<unsigned char> vch2(vch.size() + 4);
         unsigned int nSize = vch.size();
-        // BIGNUM's byte stream format expects 4 bytes of
-        // big endian size data info at the front
         vch2[0] = (nSize >> 24) & 0xff;
         vch2[1] = (nSize >> 16) & 0xff;
         vch2[2] = (nSize >> 8) & 0xff;
         vch2[3] = (nSize >> 0) & 0xff;
-        // swap data to big endian
         reverse_copy(vch.begin(), vch.end(), vch2.begin() + 4);
         BN_mpi2bn(&vch2[0], vch2.size(), this);
     }
@@ -276,6 +271,41 @@ public:
         vch.erase(vch.begin(), vch.begin() + 4);
         reverse(vch.begin(), vch.end());
         return vch;
+    }
+
+    // Canonicalize a DER signature for OpenSSL 3.0+ compatibility
+    std::vector<unsigned char> CanonicalizeSignature(const std::vector<unsigned char>& vchSig) const
+    {
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+        if (vchSig.empty())
+            return vchSig;
+
+        // Deserialize and reserialize the signature to ensure canonical DER format
+        ECDSA_SIG* sig = ECDSA_SIG_new();
+        if (!sig)
+            throw bignum_error("CanonicalizeSignature: ECDSA_SIG_new failed");
+
+        const unsigned char* pbegin = vchSig.data();
+        if (!d2i_ECDSA_SIG(&sig, &pbegin, vchSig.size())) {
+            ECDSA_SIG_free(sig);
+            throw bignum_error("CanonicalizeSignature: d2i_ECDSA_SIG failed");
+        }
+
+        // Serialize back to canonical DER format
+        unsigned int nSize = i2d_ECDSA_SIG(sig, nullptr);
+        std::vector<unsigned char> vchCanonical(nSize);
+        unsigned char* p = vchCanonical.data();
+        if (!i2d_ECDSA_SIG(sig, &p)) {
+            ECDSA_SIG_free(sig);
+            throw bignum_error("CanonicalizeSignature: i2d_ECDSA_SIG failed");
+        }
+
+        ECDSA_SIG_free(sig);
+        return vchCanonical;
+#else
+        // For OpenSSL < 3.0, no need to canonicalize as it accepts non-canonical signatures
+        return vchSig;
+#endif
     }
 
     CBigNum& SetCompact(unsigned int nCompact)
@@ -305,7 +335,6 @@ public:
 
     void SetHex(const std::string& str)
     {
-        // skip 0x
         const char* psz = str.c_str();
         while (isspace(*psz))
             psz++;
@@ -320,7 +349,6 @@ public:
         while (isspace(*psz))
             psz++;
 
-        // hex string to bignum
         static const signed char phexdigit[256] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,1,2,3,4,5,6,7,8,9,0,0,0,0,0,0, 0,0xa,0xb,0xc,0xd,0xe,0xf,0,0,0,0,0,0,0,0,0, 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0, 0,0xa,0xb,0xc,0xd,0xe,0xf,0,0,0,0,0,0,0,0,0 };
         *this = 0;
         while (isxdigit(*psz))
@@ -383,7 +411,6 @@ public:
         setvch(vch);
     }
 
-
     bool operator!() const
     {
         return BN_is_zero(this);
@@ -431,8 +458,6 @@ public:
 
     CBigNum& operator>>=(unsigned int shift)
     {
-        // Note: BN_rshift segfaults on 64-bit if 2^shift is greater than the number
-        //   if built on ubuntu 9.04 or 9.10, probably depends on version of OpenSSL
         CBigNum a = 1;
         a <<= shift;
         if (BN_cmp(&a, this) > 0)
@@ -446,10 +471,8 @@ public:
         return *this;
     }
 
-
     CBigNum& operator++()
     {
-        // prefix operator
         if (!BN_add(this, this, BN_value_one()))
             throw bignum_error("CBigNum::operator++ : BN_add failed");
         return *this;
@@ -457,7 +480,6 @@ public:
 
     const CBigNum operator++(int)
     {
-        // postfix operator
         const CBigNum ret = *this;
         ++(*this);
         return ret;
@@ -465,7 +487,6 @@ public:
 
     CBigNum& operator--()
     {
-        // prefix operator
         CBigNum r;
         if (!BN_sub(&r, this, BN_value_one()))
             throw bignum_error("CBigNum::operator-- : BN_sub failed");
@@ -475,19 +496,15 @@ public:
 
     const CBigNum operator--(int)
     {
-        // postfix operator
         const CBigNum ret = *this;
         --(*this);
         return ret;
     }
 
-
     friend inline const CBigNum operator-(const CBigNum& a, const CBigNum& b);
     friend inline const CBigNum operator/(const CBigNum& a, const CBigNum& b);
     friend inline const CBigNum operator%(const CBigNum& a, const CBigNum& b);
 };
-
-
 
 inline const CBigNum operator+(const CBigNum& a, const CBigNum& b)
 {
