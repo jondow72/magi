@@ -15,16 +15,22 @@ int EC_KEY_regenerate_key(EC_KEY *eckey, BIGNUM *priv_key)
     int ok = 0;
     BN_CTX *ctx = NULL;
     EC_POINT *pub_key = NULL;
+    EC_GROUP *group = NULL;
 
     if (!eckey) return 0;
 
-    const EC_GROUP *group = EC_KEY_get0_group(eckey);
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    group = EC_GROUP_new_by_curve_name(NID_secp256k1);
+    if (!group) goto err;
+#else
+    group = const_cast<EC_GROUP*>(EC_KEY_get0_group(eckey));
+    if (!group) goto err;
+#endif
 
     if ((ctx = BN_CTX_new()) == NULL)
         goto err;
 
     pub_key = EC_POINT_new(group);
-
     if (pub_key == NULL)
         goto err;
 
@@ -43,7 +49,10 @@ err:
         EC_POINT_free(pub_key);
     if (ctx != NULL)
         BN_CTX_free(ctx);
-
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (group)
+        EC_GROUP_free(group);
+#endif
     return ok;
 }
 
@@ -70,7 +79,14 @@ int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned ch
     int n = 0;
     int i = recid / 2;
 
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    EC_GROUP *group = EC_GROUP_new_by_curve_name(NID_secp256k1);
+    if (!group) { ret = -2; goto err; }
+#else
     const EC_GROUP *group = EC_KEY_get0_group(eckey);
+    if (!group) { ret = -2; goto err; }
+#endif
+
     if ((ctx = BN_CTX_new()) == NULL) { ret = -1; goto err; }
     BN_CTX_start(ctx);
     order = BN_CTX_get(ctx);
@@ -79,8 +95,8 @@ int ECDSA_SIG_recover_key_GFp(EC_KEY *eckey, ECDSA_SIG *ecsig, const unsigned ch
     if (!BN_copy(x, order)) { ret = -1; goto err; }
     if (!BN_mul_word(x, i)) { ret = -1; goto err; }
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
-    r = ECDSA_SIG_get0_r(ecsig); // Corrected for OpenSSL 3.0+
-    s = ECDSA_SIG_get0_s(ecsig); // Corrected for OpenSSL 3.0+
+    r = ECDSA_SIG_get0_r(ecsig);
+    s = ECDSA_SIG_get0_s(ecsig);
 #else
     ECDSA_SIG_get0(ecsig, &r, &s);
 #endif
@@ -135,6 +151,9 @@ err:
     if (R != NULL) EC_POINT_free(R);
     if (O != NULL) EC_POINT_free(O);
     if (Q != NULL) EC_POINT_free(Q);
+#if OPENSSL_VERSION_NUMBER >= 0x30000000L
+    if (group) EC_GROUP_free(group);
+#endif
     return ret;
 }
 
@@ -150,8 +169,8 @@ bool CKey::SignCompact(uint256 hash, std::vector<unsigned char>& vchSig)
     const BIGNUM *r = NULL;
     const BIGNUM *s = NULL;
 #if OPENSSL_VERSION_NUMBER >= 0x30000000L
-    r = ECDSA_SIG_get0_r(sig); // Corrected for OpenSSL 3.0+
-    s = ECDSA_SIG_get0_s(sig); // Corrected for OpenSSL 3.0+
+    r = ECDSA_SIG_get0_r(sig);
+    s = ECDSA_SIG_get0_s(sig);
 #else
     ECDSA_SIG_get0(sig, &r, &s);
 #endif
