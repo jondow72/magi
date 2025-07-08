@@ -547,6 +547,7 @@ void CNode::Cleanup()
 
 void CNode::PushVersion()
 {
+    int MIN_PROTO_VERSION = 71064; // Default value
     /// when NTP implemented, change to just nTime = GetAdjustedTime()
     int64 nTime = (fInbound ? GetAdjustedTime() : GetTime());
     CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
