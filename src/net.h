@@ -19,6 +19,10 @@
 #include "protocol.h"
 #include "addrman.h"
 #include "hash.h"
+#include <mutex>
+
+extern int MIN_PROTO_VERSION;
+extern std::mutex minProtoVersionMutex;
 
 class CRequestTracker;
 class CNode;

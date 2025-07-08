@@ -17,6 +17,10 @@
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
+#include <mutex>
+
+int MIN_PROTO_VERSION = 71064; // Default value
+std::mutex minProtoVersionMutex;
 
 using namespace std;
 using namespace boost;
@@ -3823,8 +3827,20 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CAddress addrFrom;
         uint64 nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
-        if (pfrom->nVersion < MIN_PROTO_VERSION) 
         {
+            std::lock_guard<std::mutex> lock(minProtoVersionMutex); // Thread-safe modification
+            if (pfrom->nVersion > PROTOCOL_VERSION) 
+            {
+                MIN_PROTO_VERSION = 209;
+            } 
+            else 
+            {
+                MIN_PROTO_VERSION = 71064;
+            }
+        }
+    if (pfrom->nVersion < MIN_PROTO_VERSION) 
+    {
+        // earlier versions are no longer 
             // earlier versions are no longer supported
             printf("partner %s using obsolete version %i; disconnecting\n", pfrom->addr.ToString().c_str(), pfrom->nVersion);
             pfrom->fDisconnect = true;
