@@ -1053,7 +1053,12 @@ void ThreadMapPort2(void* parg)
     struct IGDdatas data;
     int r;
 
+    #if defined(MINIUPNPC_API_VERSION) && MINIUPNPC_API_VERSION >= 14
+    char devUuid[64];
+    r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr), devUuid, sizeof(devUuid));
+    #else
     r = UPNP_GetValidIGD(devlist, &urls, &data, lanaddr, sizeof(lanaddr));
+    #endif
     if (r == 1)
     {
         if (fDiscover) {
