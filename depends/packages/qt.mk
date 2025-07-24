@@ -267,17 +267,13 @@ define $(package)_build_cmds
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) -C qtbase/src INSTALL_ROOT=$($(package)_staging_dir) $(addsuffix -install_subtargets,$(addprefix sub-,$($(package)_qt_libs))) && \
+  $(MAKE) -C qtbase INSTALL_ROOT=$($(package)_staging_dir) install && \
   $(MAKE) -C qttools/src/linguist INSTALL_ROOT=$($(package)_staging_dir) $(addsuffix -install_subtargets,$(addprefix sub-,$($(package)_linguist_tools))) && \
-  $(MAKE) -C qttranslations INSTALL_ROOT=$($(package)_staging_dir) install_subtargets && \
-  mkdir -p $(BASEDIR)/tmp && \
-  cp -r $($(package)_extract_dir)/* $(BASEDIR)/tmp
+  $(MAKE) -C qttranslations INSTALL_ROOT=$($(package)_staging_dir) install_subtargets
 endef
 
 define $(package)_postprocess_cmds
   rm -rf native/mkspecs/ native/lib/ lib/cmake/ && \
-  rm -f lib/lib*.la && \
-  mkdir -p $($(package)_extract_dir) && \
-  cp -r $(BASEDIR)/tmp/* $($(package)_extract_dir) && \
-  rm -rf $(BASEDIR)/tmp
+  rm -f lib/lib*.la
 endef
+
