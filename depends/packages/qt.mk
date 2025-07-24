@@ -269,7 +269,9 @@ endef
 define $(package)_stage_cmds
   $(MAKE) -C qtbase INSTALL_ROOT=$($(package)_staging_dir) install && \
   $(MAKE) -C qttools/src/linguist INSTALL_ROOT=$($(package)_staging_dir) $(addsuffix -install_subtargets,$(addprefix sub-,$($(package)_linguist_tools))) && \
-  $(MAKE) -C qttranslations INSTALL_ROOT=$($(package)_staging_dir) install_subtargets
+  $(MAKE) -C qttranslations INSTALL_ROOT=$($(package)_staging_dir) install_subtargets && \
+  mkdir -p $($(package)_staging_dir)/share/qt5 && \
+  cp -r $(qtbase_dir)/mkspecs $($(package)_staging_dir)/share/qt5/
 endef
 
 define $(package)_postprocess_cmds
