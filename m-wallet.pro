@@ -12,21 +12,7 @@ greaterThan(QT_MAJOR_VERSION, 4) {
     QT += widgets
 }
 
-# === BEGIN: Automatic architecture detection and configuration ===
-
-# Try to use qmake's arch detection, fallback to uname -m if empty
-QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
-isEmpty(QMAKE_CPU_ARCH) {
-    QMAKE_CPU_ARCH = $$system(uname -m)
-}
-
-# Default: disable SSE2, clear vars
-SSE2 = false
-DEPSDIR =
-BOOST_LIB_SUFFIX =
-BOOST_THREAD_LIB_SUFFIX =
-
-# Define reusable function to handle architecture and Boost detection
+# Define reusable function to handle architecture and dependency configuration
 defineTest(configureArchitecture) {
     ARCH = $$1
     DEPS_DIR = $$2
@@ -37,14 +23,36 @@ defineTest(configureArchitecture) {
     message(Checking directory: $$DEPS_DIR)
     exists($$DEPS_DIR) {
         message(Dependency directory $$DEPS_DIR found)
-        # Check for Boost libraries
+        # List Boost libraries for debugging
         message(Libraries in $$DEPS_DIR/lib: $$system(ls $$DEPS_DIR/lib/libboost* 2>/dev/null || echo "No Boost libraries found"))
 
-        # Initialize variables
+        # Set include and library paths
+        BOOST_INCLUDE_PATH = $$DEPS_DIR/include/boost
+        BOOST_LIB_PATH = $$DEPS_DIR/lib
+        BDB_INCLUDE_PATH = $$DEPS_DIR/include
+        BDB_LIB_PATH = $$DEPS_DIR/lib
+        OPENSSL_INCLUDE_PATH = $$DEPS_DIR/include
+        OPENSSL_LIB_PATH = $$DEPS_DIR/lib
+        MINIUPNPC_INCLUDE_PATH = $$DEPS_DIR/include/miniupnpc
+        MINIUPNPC_LIB_PATH = $$DEPS_DIR/lib
+        QRENCODE_INCLUDE_PATH = $$DEPS_DIR/include
+        QRENCODE_LIB_PATH = $$DEPS_DIR/lib
+        GMP_INCLUDE_PATH = $$DEPS_DIR/include
+        GMP_LIB_PATH = $$DEPS_DIR/lib
+
+        # Verify include paths exist
+        exists($$BOOST_INCLUDE_PATH) { message(Found BOOST_INCLUDE_PATH: $$BOOST_INCLUDE_PATH) } else { message(Warning: BOOST_INCLUDE_PATH $$BOOST_INCLUDE_PATH not found) }
+        exists($$BDB_INCLUDE_PATH/db.h) { message(Found BDB_INCLUDE_PATH: $$BDB_INCLUDE_PATH) } else { message(Warning: BDB_INCLUDE_PATH $$BDB_INCLUDE_PATH/db.h not found) }
+        exists($$OPENSSL_INCLUDE_PATH/openssl/ssl.h) { message(Found OPENSSL_INCLUDE_PATH: $$OPENSSL_INCLUDE_PATH) } else { message(Warning: OPENSSL_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH/openssl/ssl.h not found) }
+        exists($$MINIUPNPC_INCLUDE_PATH/miniupnpc.h) { message(Found MINIUPNPC_INCLUDE_PATH: $$MINIUPNPC_INCLUDE_PATH) } else { message(Warning: MINIUPNPC_INCLUDE_PATH $$MINIUPNPC_INCLUDE_PATH/miniupnpc.h not found) }
+        exists($$QRENCODE_INCLUDE_PATH/qrencode.h) { message(Found QRENCODE_INCLUDE_PATH: $$QRENCODE_INCLUDE_PATH) } else { message(Warning: QRENCODE_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH/qrencode.h not found) }
+        exists($$GMP_INCLUDE_PATH/gmp.h) { message(Found GMP_INCLUDE_PATH: $$GMP_INCLUDE_PATH) } else { message(Warning: GMP_INCLUDE_PATH $$GMP_INCLUDE_PATH/gmp.h not found) }
+
+        # Initialize Boost suffix variables
         BOOST_LIB_SUFFIX =
         BOOST_THREAD_LIB_SUFFIX =
 
-        # Loop through possible suffixes
+        # Loop through possible Boost suffixes
         for(suffix, POSSIBLE_SUFFIXES) {
             exists($$DEPS_DIR/lib/libboost_system$${suffix}.a) || exists($$DEPS_DIR/lib/libboost_system$${suffix}.so) {
                 BOOST_LIB_SUFFIX = $${suffix}
@@ -54,20 +62,32 @@ defineTest(configureArchitecture) {
             }
         }
 
-        # Check if a valid suffix was found
+        # Check if a valid Boost suffix was found
         isEmpty(BOOST_LIB_SUFFIX) {
             message(No valid Boost library suffix found in $$DEPS_DIR/lib. Tried suffixes: $$POSSIBLE_SUFFIXES)
-            message(Falling back to system Boost libraries.)
+            warning(Falling back to system libraries.)
+            # Fallback to system include and library paths
+            INCLUDEPATH += /usr/include /usr/local/include
+            LIBS += -L/usr/lib -L/usr/local/lib
             LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+            LIBS += -ldb_cxx -lssl -lcrypto -lminiupnpc -lqrencode -lgmp
         } else {
             message(Using Boost library suffix: $$BOOST_LIB_SUFFIX)
-            LIBS += -L$$DEPS_DIR/lib
+            # Add include paths
+            INCLUDEPATH += $$BOOST_INCLUDE_PATH $$BDB_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$MINIUPNPC_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH $$GMP_INCLUDE_PATH
+            # Add library paths and libraries
+            LIBS += -L$$BOOST_LIB_PATH -L$$BDB_LIB_PATH -L$$OPENSSL_LIB_PATH -L$$MINIUPNPC_LIB_PATH -L$$QRENCODE_LIB_PATH -L$$GMP_LIB_PATH
             LIBS += -lboost_system$$BOOST_LIB_SUFFIX -lboost_filesystem$$BOOST_LIB_SUFFIX -lboost_program_options$$BOOST_LIB_SUFFIX -lboost_thread$$BOOST_THREAD_LIB_SUFFIX -lboost_chrono$$BOOST_LIB_SUFFIX
+            LIBS += -ldb_cxx -lssl -lcrypto -lminiupnpc -lqrencode -lgmp
         }
     } else {
         message(Dependency directory $$DEPS_DIR does not exist)
-        warning(Dependency directory $$DEPS_DIR not found. Falling back to system Boost libraries.)
+        warning(Dependency directory $$DEPS_DIR not found. Falling back to system libraries.)
+        # Fallback to system include and library paths
+        INCLUDEPATH += /usr/include /usr/local/include
+        LIBS += -L/usr/lib -L/usr/local/lib
         LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+        LIBS += -ldb_cxx -lssl -lcrypto -lminiupnpc -lqrencode -lgmp
     }
 
     # Set SSE2 flags if enabled
@@ -82,15 +102,17 @@ defineTest(configureArchitecture) {
     # Export variables to parent scope
     export(BOOST_LIB_SUFFIX)
     export(BOOST_THREAD_LIB_SUFFIX)
+    export(INCLUDEPATH)
     export(LIBS)
     export(QMAKE_CXXFLAGS)
     export(QMAKE_CFLAGS)
     return(true)
 }
 
-# Debug architecture detection
+# Debug architecture and project directory
 message(QMAKE_CPU_ARCH: $$QMAKE_CPU_ARCH)
 message(HOST: $$QMAKE_HOST.host)
+message(Project directory: $$PWD)
 
 # Try to use qmake's arch detection, fallback to uname -m if empty
 QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
@@ -107,25 +129,9 @@ BOOST_THREAD_LIB_SUFFIX =
 # Common Boost suffixes
 BOOST_SUFFIXES = -mt-x64 -mt -x64 "" -mt-s-x64 -mt-a64 -mt-a32 -mt-p64 -mt-r64 -mt-s64
 
-
-# Try to use qmake's arch detection, fallback to uname -m if empty
-QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
-isEmpty(QMAKE_CPU_ARCH) {
-    QMAKE_CPU_ARCH = $$system(uname -m)
-}
-
-# Default: disable SSE2, clear vars
-SSE2 = false
-DEPSDIR =
-BOOST_LIB_SUFFIX =
-BOOST_THREAD_LIB_SUFFIX =
-
-# Common Boost suffixes for all architectures
-BOOST_SUFFIXES = -mt-x64 -mt -x64 "" -mt-s-x64 -mt-a64 -mt-a32 -mt-p64 -mt-r64 -mt-s64
-
 # x86 64-bit Linux
 contains(QMAKE_CPU_ARCH, "x86_64") {
-    configureArchitecture(x86_64, depends/x86_64-pc-linux-gnu, $$BOOST_SUFFIXES, true)
+    configureArchitecture(x86_64, $$PWD/depends/x86_64-pc-linux-gnu, $$BOOST_SUFFIXES, true)
 }
 # x86 32-bit Linux
 else:contains(QMAKE_CPU_ARCH, "i686")|contains(QMAKE_CPU_ARCH, "i386") {
