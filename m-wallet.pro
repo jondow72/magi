@@ -12,6 +12,191 @@ greaterThan(QT_MAJOR_VERSION, 4) {
     QT += widgets
 }
 
+# Define reusable function to handle architecture and dependency configuration
+defineTest(configureArchitecture) {
+    ARCH = $$1
+    DEPS_DIR = $$2
+    POSSIBLE_SUFFIXES = $$3
+    SSE2_ENABLED = $$4
+
+    message(Configuring for architecture: $$ARCH)
+    message(Checking directory: $$DEPS_DIR)
+    exists($$DEPS_DIR) {
+        message(Dependency directory $$DEPS_DIR found)
+        # List Boost libraries for debugging
+        message(Libraries in $$DEPS_DIR/lib: $$system(ls $$DEPS_DIR/lib/libboost* 2>/dev/null || echo "No Boost libraries found"))
+
+        # Set include and library paths
+        BOOST_INCLUDE_PATH = $$DEPS_DIR/include/boost
+        BOOST_LIB_PATH = $$DEPS_DIR/lib
+        BDB_INCLUDE_PATH = $$DEPS_DIR/include
+        BDB_LIB_PATH = $$DEPS_DIR/lib
+        OPENSSL_INCLUDE_PATH = $$DEPS_DIR/include
+        OPENSSL_LIB_PATH = $$DEPS_DIR/lib
+        MINIUPNPC_INCLUDE_PATH = $$DEPS_DIR/include/miniupnpc
+        MINIUPNPC_LIB_PATH = $$DEPS_DIR/lib
+        QRENCODE_INCLUDE_PATH = $$DEPS_DIR/include
+        QRENCODE_LIB_PATH = $$DEPS_DIR/lib
+        GMP_INCLUDE_PATH = $$DEPS_DIR/include
+        GMP_LIB_PATH = $$DEPS_DIR/lib
+
+        # Verify include paths exist
+        exists($$BOOST_INCLUDE_PATH) { message(Found BOOST_INCLUDE_PATH: $$BOOST_INCLUDE_PATH) } else { message(Warning: BOOST_INCLUDE_PATH $$BOOST_INCLUDE_PATH not found) }
+        exists($$BDB_INCLUDE_PATH/db.h) { message(Found BDB_INCLUDE_PATH: $$BDB_INCLUDE_PATH) } else { message(Warning: BDB_INCLUDE_PATH $$BDB_INCLUDE_PATH/db.h not found) }
+        exists($$OPENSSL_INCLUDE_PATH/openssl/ssl.h) { message(Found OPENSSL_INCLUDE_PATH: $$OPENSSL_INCLUDE_PATH) } else { message(Warning: OPENSSL_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH/openssl/ssl.h not found) }
+        exists($$MINIUPNPC_INCLUDE_PATH/miniupnpc.h) { message(Found MINIUPNPC_INCLUDE_PATH: $$MINIUPNPC_INCLUDE_PATH) } else { message(Warning: MINIUPNPC_INCLUDE_PATH $$MINIUPNPC_INCLUDE_PATH/miniupnpc.h not found) }
+        exists($$QRENCODE_INCLUDE_PATH/qrencode.h) { message(Found QRENCODE_INCLUDE_PATH: $$QRENCODE_INCLUDE_PATH) } else { message(Warning: QRENCODE_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH/qrencode.h not found) }
+        exists($$GMP_INCLUDE_PATH/gmp.h) { message(Found GMP_INCLUDE_PATH: $$GMP_INCLUDE_PATH) } else { message(Warning: GMP_INCLUDE_PATH $$GMP_INCLUDE_PATH/gmp.h not found) }
+
+        # Initialize Boost suffix variables
+        BOOST_LIB_SUFFIX =
+        BOOST_THREAD_LIB_SUFFIX =
+
+        # Loop through possible Boost suffixes
+        for(suffix, POSSIBLE_SUFFIXES) {
+            exists($$DEPS_DIR/lib/libboost_system$${suffix}.a) || exists($$DEPS_DIR/lib/libboost_system$${suffix}.so) {
+                BOOST_LIB_SUFFIX = $${suffix}
+                BOOST_THREAD_LIB_SUFFIX = $${suffix}
+                message(Detected Boost library suffix: $${suffix})
+                break()
+            }
+        }
+
+        # Check if a valid Boost suffix was found
+        isEmpty(BOOST_LIB_SUFFIX) {
+            message(No valid Boost library suffix found in $$DEPS_DIR/lib. Tried suffixes: $$POSSIBLE_SUFFIXES)
+            warning(Falling back to system libraries.)
+            # Fallback to system include and library paths
+            INCLUDEPATH += /usr/include /usr/local/include
+            LIBS += -L/usr/lib -L/usr/local/lib
+            LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+            LIBS += -ldb_cxx -lssl -lcrypto -lminiupnpc -lqrencode -lgmp
+        } else {
+            message(Using Boost library suffix: $$BOOST_LIB_SUFFIX)
+            # Add include paths
+            INCLUDEPATH += $$BOOST_INCLUDE_PATH $$BDB_INCLUDE_PATH $$OPENSSL_INCLUDE_PATH $$MINIUPNPC_INCLUDE_PATH $$QRENCODE_INCLUDE_PATH $$GMP_INCLUDE_PATH
+            # Add library paths and libraries
+            LIBS += -L$$BOOST_LIB_PATH -L$$BDB_LIB_PATH -L$$OPENSSL_LIB_PATH -L$$MINIUPNPC_LIB_PATH -L$$QRENCODE_LIB_PATH -L$$GMP_LIB_PATH
+            LIBS += -lboost_system$$BOOST_LIB_SUFFIX -lboost_filesystem$$BOOST_LIB_SUFFIX -lboost_program_options$$BOOST_LIB_SUFFIX -lboost_thread$$BOOST_THREAD_LIB_SUFFIX -lboost_chrono$$BOOST_LIB_SUFFIX
+            LIBS += -ldb_cxx -lssl -lcrypto -lminiupnpc -lqrencode -lgmp
+        }
+    } else {
+        message(Dependency directory $$DEPS_DIR does not exist)
+        warning(Dependency directory $$DEPS_DIR not found. Falling back to system libraries.)
+        # Fallback to system include and library paths
+        INCLUDEPATH += /usr/include /usr/local/include
+        LIBS += -L/usr/lib -L/usr/local/lib
+        LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+        LIBS += -ldb_cxx -lssl -lcrypto -lminiupnpc -lqrencode -lgmp
+    }
+
+    # Set SSE2 flags if enabled
+    equals(SSE2_ENABLED, true) {
+        message(Building with SSE2 support for $$ARCH)
+        QMAKE_CXXFLAGS += -msse2
+        QMAKE_CFLAGS += -msse2
+    } else {
+        message(Building without SSE2 support for $$ARCH)
+    }
+
+    # Export variables to parent scope
+    export(BOOST_LIB_SUFFIX)
+    export(BOOST_THREAD_LIB_SUFFIX)
+    export(INCLUDEPATH)
+    export(LIBS)
+    export(QMAKE_CXXFLAGS)
+    export(QMAKE_CFLAGS)
+    return(true)
+}
+
+# Debug architecture and project directory
+message(QMAKE_CPU_ARCH: $$QMAKE_CPU_ARCH)
+message(HOST: $$QMAKE_HOST.host)
+message(Project directory: $$PWD)
+
+# Try to use qmake's arch detection, fallback to uname -m if empty
+QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
+isEmpty(QMAKE_CPU_ARCH) {
+    QMAKE_CPU_ARCH = $$system(uname -m)
+}
+
+# Default: disable SSE2, clear vars
+SSE2 = false
+DEPSDIR =
+BOOST_LIB_SUFFIX =
+BOOST_THREAD_LIB_SUFFIX =
+
+# Common Boost suffixes
+BOOST_SUFFIXES = -mt-x64 -mt -x64 "" -mt-s-x64 -mt-a64 -mt-a32 -mt-p64 -mt-r64 -mt-s64
+
+# x86 64-bit Linux
+contains(QMAKE_CPU_ARCH, "x86_64") {
+    configureArchitecture(x86_64, $$PWD/depends/x86_64-pc-linux-gnu, $$BOOST_SUFFIXES, true)
+}
+# x86 32-bit Linux
+else:contains(QMAKE_CPU_ARCH, "i686")|contains(QMAKE_CPU_ARCH, "i386") {
+    configureArchitecture(i686, /depends/i686-pc-linux-gnu, $$BOOST_SUFFIXES, true)
+}
+# x86_64 Windows (MinGW)
+else:contains(HOST, "x86_64-w64-mingw32") {
+    configureArchitecture(x86_64-w64-mingw32, /depends/x86_64-w64-mingw32, $$BOOST_SUFFIXES, true)
+}
+# i686 Windows (MinGW)
+else:contains(HOST, "i686-w64-mingw32") {
+    configureArchitecture(i686-w64-mingw32, /depends/i686-w64-mingw32, $$BOOST_SUFFIXES, true)
+}
+# Mac x86_64
+else:contains(QMAKE_CPU_ARCH, "x86_64")|contains(HOST, "x86_64-apple-darwin") {
+    configureArchitecture(x86_64-apple-darwin, /depends/x86_64-apple-darwin, $$BOOST_SUFFIXES, true)
+}
+# Mac arm64 (Apple Silicon)
+else:contains(QMAKE_CPU_ARCH, "arm64")|contains(HOST, "arm64-apple-darwin") {
+    configureArchitecture(arm64-apple-darwin, /depends/arm64-apple-darwin, $$BOOST_SUFFIXES, false)
+}
+# Linux ARM 32
+else:contains(QMAKE_CPU_ARCH, "arm")|contains(HOST, "arm-linux-gnueabihf") {
+    configureArchitecture(arm-linux-gnueabihf, /depends/arm-linux-gnueabihf, $$BOOST_SUFFIXES, false)
+}
+# Linux ARM 64
+else:contains(QMAKE_CPU_ARCH, "aarch64")|contains(HOST, "aarch64-linux-gnu") {
+    configureArchitecture(aarch64-linux-gnu, /depends/aarch64-linux-gnu, $$BOOST_SUFFIXES, false)
+}
+# PowerPC64
+else:contains(QMAKE_CPU_ARCH, "powerpc64")|contains(HOST, "powerpc64-linux-gnu") {
+    configureArchitecture(powerpc64-linux-gnu, /depends/powerpc64-linux-gnu, $$BOOST_SUFFIXES, false)
+}
+# PowerPC64le
+else:contains(HOST, "powerpc64le-linux-gnu") {
+    configureArchitecture(powerpc64le-linux-gnu, /depends/powerpc64le-linux-gnu, $$BOOST_SUFFIXES, false)
+}
+# RISC-V 32
+else:contains(QMAKE_CPU_ARCH, "riscv32")|contains(HOST, "riscv32-linux-gnu") {
+    configureArchitecture(riscv32-linux-gnu, /depends/riscv32-linux-gnu, $$BOOST_SUFFIXES, false)
+}
+# RISC-V 64
+else:contains(QMAKE_CPU_ARCH, "riscv64")|contains(HOST, "riscv64-linux-gnu") {
+    configureArchitecture(riscv64-linux-gnu, /depends/riscv64-linux-gnu, $$BOOST_SUFFIXES, false)
+}
+# S390x
+else:contains(QMAKE_CPU_ARCH, "s390x")|contains(HOST, "s390x-linux-gnu") {
+    configureArchitecture(s390x-linux-gnu, /depends/s390x-linux-gnu, $$BOOST_SUFFIXES, false)
+}
+# Android ARM (32)
+else:contains(HOST, "armv7a-linux-android") {
+    configureArchitecture(armv7a-linux-android, /depends/armv7a-linux-android, $$BOOST_SUFFIXES, false)
+}
+# Android ARM64
+else:contains(HOST, "aarch64-linux-android") {
+    configureArchitecture(aarch64-linux-android, /depends/aarch64-linux-android, $$BOOST_SUFFIXES, false)
+}
+# Android x86_64
+else:contains(HOST, "x86_64-linux-android") {
+    configureArchitecture(x86_64-linux-android, /depends/x86_64-linux-android, $$BOOST_SUFFIXES, true)
+}
+else {
+    error("Unknown or unsupported architecture ($$QMAKE_CPU_ARCH / $$HOST) -- please add to autodetect block")
+}
+
 # for boost > 1.37, add -mt to the boost libraries
 # use: qmake BOOST_LIB_SUFFIX=-mt
 # for boost thread win32 with _win32 sufix
@@ -20,7 +205,8 @@ greaterThan(QT_MAJOR_VERSION, 4) {
 
 # Dependency library locations can be customized using following settings 
 # winbuild dependencies
-win32 {
+win32:!cross_compile {
+    # Native Windows build
 #    BOOST_LIB_SUFFIX=-mgw49-mt-s-1_58
     BOOST_INCLUDE_PATH=$$DEPSDIR/boost_1_58_0
     BOOST_LIB_PATH=$$DEPSDIR/boost_1_58_0/stage/lib
@@ -34,6 +220,20 @@ win32 {
     QRENCODE_LIB_PATH=$$DEPSDIR/qrencode-3.4.3/.libs
     GMP_INCLUDE_PATH=$$DEPSDIR/gmp-6.0.0
     GMP_LIB_PATH=$$DEPSDIR/gmp-6.0.0/.libs
+} else {
+    # Everything else (Linux, cross-compile, etc)
+    BOOST_INCLUDE_PATH=$$DEPSDIR/include/boost
+    BOOST_LIB_PATH=$$DEPSDIR/lib
+    BDB_INCLUDE_PATH=$$DEPSDIR/include
+    BDB_LIB_PATH=$$DEPSDIR/lib
+    OPENSSL_INCLUDE_PATH=$$DEPSDIR/include
+    OPENSSL_LIB_PATH=$$DEPSDIR/lib
+    MINIUPNPC_INCLUDE_PATH=$$DEPSDIR/include/miniupnpc
+    MINIUPNPC_LIB_PATH=$$DEPSDIR/lib
+    QRENCODE_INCLUDE_PATH=$$DEPSDIR/include
+    QRENCODE_LIB_PATH=$$DEPSDIR/lib
+    GMP_INCLUDE_PATH=$$DEPSDIR/include
+    GMP_LIB_PATH=$$DEPSDIR/lib
 }
 
 OBJECTS_DIR = build
@@ -82,7 +282,7 @@ contains(USE_UPNP, -) {
     count(USE_UPNP, 0) {
         USE_UPNP=1
     }
-    DEFINES += USE_UPNP=$$USE_UPNP STATICLIB
+    DEFINES += USE_UPNP=$$USE_UPNP STATICLIB MINIUPNP_STATICLIB
     INCLUDEPATH += $$MINIUPNPC_INCLUDE_PATH
     LIBS += $$join(MINIUPNPC_LIB_PATH,,-L,) -lminiupnpc
     win32:LIBS += -liphlpapi
@@ -154,24 +354,6 @@ QMAKE_CLEAN += $$PWD/src/leveldb/libleveldb.a; cd $$PWD/src/leveldb ; $(MAKE) cl
     QMAKE_EXTRA_TARGETS += genbuild
     DEFINES += HAVE_BUILD_INFO
 }
-
-# If we have an ARM device, we can't use SSE2 instructions, so don't try to use them
-QMAKE_XCPUARCH = $$QMAKE_HOST.arch
-equals(QMAKE_XCPUARCH, armv7l) {
-    message(Building without SSE2 support)
-}
-else:equals(QMAKE_XCPUARCH, armv6l) {
-    message(Building without SSE2 support)
-}
-else:equals(QMAKE_XCPUARCH, aarch64) {
-    message(Building without SSE2 support)
-}
-else {
-    message(Building with SSE2 support)
-    QMAKE_CXXFLAGS += -msse2
-    QMAKE_CFLAGS += -msse2
-}
-#endif
 
 QMAKE_CXXFLAGS_WARN_ON = -fdiagnostics-show-option -Wall -Wextra -Wformat -Wformat-security -Wno-unused-parameter -Wstack-protector
 
@@ -376,9 +558,12 @@ CODECFORTR = UTF-8
 # also add new translations to src/qt/magi.qrc under translations/
 TRANSLATIONS = $$files(src/qt/locale/bitcoin_*.ts)
 
-isEmpty(QMAKE_LRELEASE) {
-    win32:QMAKE_LRELEASE = $$[QT_INSTALL_BINS]\\lrelease.exe
-    else:QMAKE_LRELEASE = $$[QT_INSTALL_BINS]/lrelease
+win32:!cross_compile {
+    # Native Windows build
+    QMAKE_LRELEASE = $$[QT_INSTALL_BINS]\\lrelease.exe
+} else {
+    # Everything else (Linux, cross-compile, etc)
+    QMAKE_LRELEASE = $$[QT_INSTALL_BINS]/lrelease
 }
 isEmpty(QM_DIR):QM_DIR = $$PWD/src/qt/locale
 # automatically build translations, so they can be included in resource file
