@@ -26,7 +26,7 @@ DEPSDIR =
 BOOST_LIB_SUFFIX =
 BOOST_THREAD_LIB_SUFFIX =
 
-# Define a reusable function to handle architecture and Boost detection
+# Define reusable function to handle architecture and Boost detection
 defineTest(configureArchitecture) {
     ARCH = $$1
     DEPS_DIR = $$2
@@ -34,16 +34,17 @@ defineTest(configureArchitecture) {
     SSE2_ENABLED = $$4
 
     message(Configuring for architecture: $$ARCH)
-
-    # Check if dependency directory exists
+    message(Checking directory: $$DEPS_DIR)
     exists($$DEPS_DIR) {
         message(Dependency directory $$DEPS_DIR found)
+        # Check for Boost libraries
+        message(Libraries in $$DEPS_DIR/lib: $$system(ls $$DEPS_DIR/lib/libboost* 2>/dev/null || echo "No Boost libraries found"))
 
         # Initialize variables
         BOOST_LIB_SUFFIX =
         BOOST_THREAD_LIB_SUFFIX =
 
-        # Loop through possible suffixes to find the correct one
+        # Loop through possible suffixes
         for(suffix, POSSIBLE_SUFFIXES) {
             exists($$DEPS_DIR/lib/libboost_system$${suffix}.a) || exists($$DEPS_DIR/lib/libboost_system$${suffix}.so) {
                 BOOST_LIB_SUFFIX = $${suffix}
@@ -55,8 +56,8 @@ defineTest(configureArchitecture) {
 
         # Check if a valid suffix was found
         isEmpty(BOOST_LIB_SUFFIX) {
-            warning(No valid Boost library suffix found in $$DEPS_DIR/lib. Tried suffixes: $$POSSIBLE_SUFFIXES)
-            warning(Falling back to system Boost libraries.)
+            message(No valid Boost library suffix found in $$DEPS_DIR/lib. Tried suffixes: $$POSSIBLE_SUFFIXES)
+            message(Falling back to system Boost libraries.)
             LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
         } else {
             message(Using Boost library suffix: $$BOOST_LIB_SUFFIX)
@@ -64,6 +65,7 @@ defineTest(configureArchitecture) {
             LIBS += -lboost_system$$BOOST_LIB_SUFFIX -lboost_filesystem$$BOOST_LIB_SUFFIX -lboost_program_options$$BOOST_LIB_SUFFIX -lboost_thread$$BOOST_THREAD_LIB_SUFFIX -lboost_chrono$$BOOST_LIB_SUFFIX
         }
     } else {
+        message(Dependency directory $$DEPS_DIR does not exist)
         warning(Dependency directory $$DEPS_DIR not found. Falling back to system Boost libraries.)
         LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
     }
@@ -83,9 +85,28 @@ defineTest(configureArchitecture) {
     export(LIBS)
     export(QMAKE_CXXFLAGS)
     export(QMAKE_CFLAGS)
-
     return(true)
 }
+
+# Debug architecture detection
+message(QMAKE_CPU_ARCH: $$QMAKE_CPU_ARCH)
+message(HOST: $$QMAKE_HOST.host)
+
+# Try to use qmake's arch detection, fallback to uname -m if empty
+QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
+isEmpty(QMAKE_CPU_ARCH) {
+    QMAKE_CPU_ARCH = $$system(uname -m)
+}
+
+# Default: disable SSE2, clear vars
+SSE2 = false
+DEPSDIR =
+BOOST_LIB_SUFFIX =
+BOOST_THREAD_LIB_SUFFIX =
+
+# Common Boost suffixes
+BOOST_SUFFIXES = -mt-x64 -mt -x64 "" -mt-s-x64 -mt-a64 -mt-a32 -mt-p64 -mt-r64 -mt-s64
+
 
 # Try to use qmake's arch detection, fallback to uname -m if empty
 QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
@@ -104,7 +125,7 @@ BOOST_SUFFIXES = -mt-x64 -mt -x64 "" -mt-s-x64 -mt-a64 -mt-a32 -mt-p64 -mt-r64 -
 
 # x86 64-bit Linux
 contains(QMAKE_CPU_ARCH, "x86_64") {
-    configureArchitecture(x86_64, /depends/x86_64-pc-linux-gnu, $$BOOST_SUFFIXES, true)
+    configureArchitecture(x86_64, depends/x86_64-pc-linux-gnu, $$BOOST_SUFFIXES, true)
 }
 # x86 32-bit Linux
 else:contains(QMAKE_CPU_ARCH, "i686")|contains(QMAKE_CPU_ARCH, "i386") {
