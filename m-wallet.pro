@@ -26,138 +26,149 @@ DEPSDIR =
 BOOST_LIB_SUFFIX =
 BOOST_THREAD_LIB_SUFFIX =
 
+# Define a reusable function to handle architecture and Boost detection
+defineTest(configureArchitecture) {
+    ARCH = $$1
+    DEPS_DIR = $$2
+    POSSIBLE_SUFFIXES = $$3
+    SSE2_ENABLED = $$4
+
+    message(Configuring for architecture: $$ARCH)
+
+    # Check if dependency directory exists
+    exists($$DEPS_DIR) {
+        message(Dependency directory $$DEPS_DIR found)
+
+        # Initialize variables
+        BOOST_LIB_SUFFIX =
+        BOOST_THREAD_LIB_SUFFIX =
+
+        # Loop through possible suffixes to find the correct one
+        for(suffix, POSSIBLE_SUFFIXES) {
+            exists($$DEPS_DIR/lib/libboost_system$${suffix}.a) || exists($$DEPS_DIR/lib/libboost_system$${suffix}.so) {
+                BOOST_LIB_SUFFIX = $${suffix}
+                BOOST_THREAD_LIB_SUFFIX = $${suffix}
+                message(Detected Boost library suffix: $${suffix})
+                break()
+            }
+        }
+
+        # Check if a valid suffix was found
+        isEmpty(BOOST_LIB_SUFFIX) {
+            warning(No valid Boost library suffix found in $$DEPS_DIR/lib. Tried suffixes: $$POSSIBLE_SUFFIXES)
+            warning(Falling back to system Boost libraries.)
+            LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+        } else {
+            message(Using Boost library suffix: $$BOOST_LIB_SUFFIX)
+            LIBS += -L$$DEPS_DIR/lib
+            LIBS += -lboost_system$$BOOST_LIB_SUFFIX -lboost_filesystem$$BOOST_LIB_SUFFIX -lboost_program_options$$BOOST_LIB_SUFFIX -lboost_thread$$BOOST_THREAD_LIB_SUFFIX -lboost_chrono$$BOOST_LIB_SUFFIX
+        }
+    } else {
+        warning(Dependency directory $$DEPS_DIR not found. Falling back to system Boost libraries.)
+        LIBS += -lboost_system -lboost_filesystem -lboost_program_options -lboost_thread -lboost_chrono
+    }
+
+    # Set SSE2 flags if enabled
+    equals(SSE2_ENABLED, true) {
+        message(Building with SSE2 support for $$ARCH)
+        QMAKE_CXXFLAGS += -msse2
+        QMAKE_CFLAGS += -msse2
+    } else {
+        message(Building without SSE2 support for $$ARCH)
+    }
+
+    # Export variables to parent scope
+    export(BOOST_LIB_SUFFIX)
+    export(BOOST_THREAD_LIB_SUFFIX)
+    export(LIBS)
+    export(QMAKE_CXXFLAGS)
+    export(QMAKE_CFLAGS)
+
+    return(true)
+}
+
+# Try to use qmake's arch detection, fallback to uname -m if empty
+QMAKE_CPU_ARCH = $$QMAKE_HOST.arch
+isEmpty(QMAKE_CPU_ARCH) {
+    QMAKE_CPU_ARCH = $$system(uname -m)
+}
+
+# Default: disable SSE2, clear vars
+SSE2 = false
+DEPSDIR =
+BOOST_LIB_SUFFIX =
+BOOST_THREAD_LIB_SUFFIX =
+
+# Common Boost suffixes for all architectures
+BOOST_SUFFIXES = -mt-x64 -mt -x64 "" -mt-s-x64 -mt-a64 -mt-a32 -mt-p64 -mt-r64 -mt-s64
+
 # x86 64-bit Linux
 contains(QMAKE_CPU_ARCH, "x86_64") {
-    message(Detected architecture: x86_64 (Linux or MinGW64))
-    DEPSDIR = /depends/x86_64-pc-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-x64
-    BOOST_THREAD_LIB_SUFFIX = -mt-x64
-    SSE2 = true
+    configureArchitecture(x86_64, /depends/x86_64-pc-linux-gnu, $$BOOST_SUFFIXES, true)
 }
 # x86 32-bit Linux
 else:contains(QMAKE_CPU_ARCH, "i686")|contains(QMAKE_CPU_ARCH, "i386") {
-    message(Detected architecture: i686/i386 (Linux or MinGW32))
-    DEPSDIR = /depends/i686-pc-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-x32
-    BOOST_THREAD_LIB_SUFFIX = -mt-x32
-    SSE2 = true
+    configureArchitecture(i686, /depends/i686-pc-linux-gnu, $$BOOST_SUFFIXES, true)
 }
 # x86_64 Windows (MinGW)
 else:contains(HOST, "x86_64-w64-mingw32") {
-    message(Detected architecture: x86_64-w64-mingw32)
-    DEPSDIR = /depends/x86_64-w64-mingw32
-    BOOST_LIB_SUFFIX = -mt-s-x64
-    BOOST_THREAD_LIB_SUFFIX = -mt-s-x64
-    SSE2 = true
+    configureArchitecture(x86_64-w64-mingw32, /depends/x86_64-w64-mingw32, $$BOOST_SUFFIXES, true)
 }
 # i686 Windows (MinGW)
 else:contains(HOST, "i686-w64-mingw32") {
-    message(Detected architecture: i686-w64-mingw32)
-    DEPSDIR = /depends/i686-w64-mingw32
-    BOOST_LIB_SUFFIX = -mt-s-x32
-    BOOST_THREAD_LIB_SUFFIX = -mt-s-x32
-    SSE2 = true
+    configureArchitecture(i686-w64-mingw32, /depends/i686-w64-mingw32, $$BOOST_SUFFIXES, true)
 }
 # Mac x86_64
 else:contains(QMAKE_CPU_ARCH, "x86_64")|contains(HOST, "x86_64-apple-darwin") {
-    message(Detected architecture: Mac x86_64)
-    DEPSDIR = /depends/x86_64-apple-darwin
-    BOOST_LIB_SUFFIX = -mt-a64
-    BOOST_THREAD_LIB_SUFFIX = -mt-a64
-    SSE2 = true
+    configureArchitecture(x86_64-apple-darwin, /depends/x86_64-apple-darwin, $$BOOST_SUFFIXES, true)
 }
 # Mac arm64 (Apple Silicon)
 else:contains(QMAKE_CPU_ARCH, "arm64")|contains(HOST, "arm64-apple-darwin") {
-    message(Detected architecture: Mac arm64)
-    DEPSDIR = /depends/arm64-apple-darwin
-    BOOST_LIB_SUFFIX = -mt-a64
-    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+    configureArchitecture(arm64-apple-darwin, /depends/arm64-apple-darwin, $$BOOST_SUFFIXES, false)
 }
 # Linux ARM 32
 else:contains(QMAKE_CPU_ARCH, "arm")|contains(HOST, "arm-linux-gnueabihf") {
-    message(Detected architecture: ARM 32-bit Linux)
-    DEPSDIR = /depends/arm-linux-gnueabihf
-    BOOST_LIB_SUFFIX = -mt-a32
-    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+    configureArchitecture(arm-linux-gnueabihf, /depends/arm-linux-gnueabihf, $$BOOST_SUFFIXES, false)
 }
 # Linux ARM 64
 else:contains(QMAKE_CPU_ARCH, "aarch64")|contains(HOST, "aarch64-linux-gnu") {
-    message(Detected architecture: ARM 64-bit Linux)
-    DEPSDIR = /depends/aarch64-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-a64
-    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+    configureArchitecture(aarch64-linux-gnu, /depends/aarch64-linux-gnu, $$BOOST_SUFFIXES, false)
 }
 # PowerPC64
 else:contains(QMAKE_CPU_ARCH, "powerpc64")|contains(HOST, "powerpc64-linux-gnu") {
-    message(Detected architecture: PowerPC 64-bit)
-    DEPSDIR = /depends/powerpc64-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-p64
-    BOOST_THREAD_LIB_SUFFIX = -mt-p64
+    configureArchitecture(powerpc64-linux-gnu, /depends/powerpc64-linux-gnu, $$BOOST_SUFFIXES, false)
 }
 # PowerPC64le
 else:contains(HOST, "powerpc64le-linux-gnu") {
-    message(Detected architecture: PowerPC64le)
-    DEPSDIR = /depends/powerpc64le-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-p64
-    BOOST_THREAD_LIB_SUFFIX = -mt-p64
+    configureArchitecture(powerpc64le-linux-gnu, /depends/powerpc64le-linux-gnu, $$BOOST_SUFFIXES, false)
 }
 # RISC-V 32
 else:contains(QMAKE_CPU_ARCH, "riscv32")|contains(HOST, "riscv32-linux-gnu") {
-    message(Detected architecture: RISC-V 32)
-    DEPSDIR = /depends/riscv32-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-a32
-    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+    configureArchitecture(riscv32-linux-gnu, /depends/riscv32-linux-gnu, $$BOOST_SUFFIXES, false)
 }
 # RISC-V 64
 else:contains(QMAKE_CPU_ARCH, "riscv64")|contains(HOST, "riscv64-linux-gnu") {
-    message(Detected architecture: RISC-V 64)
-    DEPSDIR = /depends/riscv64-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-r64
-    BOOST_THREAD_LIB_SUFFIX = -mt-r64
+    configureArchitecture(riscv64-linux-gnu, /depends/riscv64-linux-gnu, $$BOOST_SUFFIXES, false)
 }
 # S390x
 else:contains(QMAKE_CPU_ARCH, "s390x")|contains(HOST, "s390x-linux-gnu") {
-    message(Detected architecture: s390x)
-    DEPSDIR = /depends/s390x-linux-gnu
-    BOOST_LIB_SUFFIX = -mt-s64
-    BOOST_THREAD_LIB_SUFFIX = -mt-s64
+    configureArchitecture(s390x-linux-gnu, /depends/s390x-linux-gnu, $$BOOST_SUFFIXES, false)
 }
 # Android ARM (32)
 else:contains(HOST, "armv7a-linux-android") {
-    message(Detected architecture: Android ARMv7a)
-    DEPSDIR = /depends/armv7a-linux-android
-    BOOST_LIB_SUFFIX = -mt-a32
-    BOOST_THREAD_LIB_SUFFIX = -mt-a32
+    configureArchitecture(armv7a-linux-android, /depends/armv7a-linux-android, $$BOOST_SUFFIXES, false)
 }
 # Android ARM64
 else:contains(HOST, "aarch64-linux-android") {
-    message(Detected architecture: Android ARM64)
-    DEPSDIR = /depends/aarch64-linux-android
-    BOOST_LIB_SUFFIX = -mt-a64
-    BOOST_THREAD_LIB_SUFFIX = -mt-a64
+    configureArchitecture(aarch64-linux-android, /depends/aarch64-linux-android, $$BOOST_SUFFIXES, false)
 }
 # Android x86_64
 else:contains(HOST, "x86_64-linux-android") {
-    message(Detected architecture: Android x86_64)
-    DEPSDIR = /depends/x86_64-linux-android
-    BOOST_LIB_SUFFIX = -mt-a64
-    BOOST_THREAD_LIB_SUFFIX = -mt-a64
-    SSE2 = true
+    configureArchitecture(x86_64-linux-android, /depends/x86_64-linux-android, $$BOOST_SUFFIXES, true)
 }
 else {
     error("Unknown or unsupported architecture ($$QMAKE_CPU_ARCH / $$HOST) -- please add to autodetect block")
 }
-
-# Set SSE2 flags
-equals(SSE2, true) {
-    message(Building with SSE2 support)
-    QMAKE_CXXFLAGS += -msse2
-    QMAKE_CFLAGS += -msse2
-} else {
-    message(Building without SSE2 support)
-}
-
-# === END: Automatic architecture detection and configuration ===
 
 # for boost > 1.37, add -mt to the boost libraries
 # use: qmake BOOST_LIB_SUFFIX=-mt
