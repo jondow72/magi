@@ -278,6 +278,5 @@ define $(package)_postprocess_cmds
   rm -rf native/mkspecs/ native/lib/ lib/cmake/ && \
   rm -f lib/lib*.la && \
   mkdir -p $($(package)_extract_dir) && \
-  cp -r $(BASEDIR)/tmp/* $($(package)_staging_dir) && \
-  rm -rf $(BASEDIR)/tmp
+  cp -r $(BASEDIR)/tmp/* $($(package)_staging_dir)
 endef
