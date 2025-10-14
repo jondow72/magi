@@ -12,7 +12,6 @@
 #include "ui_interface.h"
 #include "kernel.h"
 #include "txdb.h"
-#include "scrypt_mine.h"
 #include "magirpc.h"
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/filesystem.hpp>

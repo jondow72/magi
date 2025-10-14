@@ -9,7 +9,6 @@
 #include "sync.h"
 #include "net.h"
 #include "script.h"
-#include "scrypt_mine.h"
 #include "hash_magi.h"
 
 #include <list>
