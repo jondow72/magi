@@ -197,7 +197,6 @@ HEADERS += \
     src/hash.h \
     src/uint256.h \
     src/kernel.h \
-    src/scrypt_mine.h \
     src/pbkdf2.h \
     src/serialize.h \
     src/strlcpy.h \
