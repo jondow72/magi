@@ -1034,8 +1034,8 @@ public:
 
     uint256 GetHash() const
     {
-        if (fTestNet) {
-            return hash_M7M_v2(BEGIN(nVersion), END(nNonce), nNonce);
+//        if (fTestNet) {
+//            return hash_M7M_v2(BEGIN(nVersion), END(nNonce), nNonce);
             /*
             if(nTime < 1413590400) {
                 return hash_M7M(BEGIN(nVersion), END(nNonce));
@@ -1043,13 +1043,13 @@ public:
                 return hash_M7M_v2(BEGIN(nVersion), END(nNonce), nNonce);
             }
             */
-        } else {
+//        } else {
             if(nTime < 1414330200) {
                 return hash_M7M(BEGIN(nVersion), END(nNonce));
             } else {
                 return hash_M7M_v2(BEGIN(nVersion), END(nNonce), nNonce);
             }
-        }
+//        }
     }
 
     int64 GetBlockTime() const

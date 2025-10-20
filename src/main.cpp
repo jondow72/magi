@@ -1115,28 +1115,12 @@ int64 GetProofOfWorkRewardV2(const CBlockIndex* pindexPrev, int64 nFees, bool fL
     int nHeight = pindex0->nHeight;
     int64 nSubsidy = 0;
     
-//      double rDiff = GetDifficultyFromBitsV2(pindex0); 
-//      printf("@@BLKV2-test (nHeight, rDiff, rSubsidy) = (%d, %f, %f)\n", 
-//    nHeight, rDiff, double(nSubsidy)/double(COIN));
-      
-    if (fTestNet) {
-//        if (nHeight%2 == 0) nSubsidy = 1000 * COIN;
-//        else nSubsidy = GetProofOfWorkReward_OPM(pindex0);
-        nSubsidy = 1000 * COIN;
-        return nSubsidy + nFees;
-    }
-
     if (nHeight <= END_MAGI_POW_HEIGHT_V2) {    // difficulty dependent PoW-II mining
        nSubsidy = GetProofOfWorkReward_OPM(pindex0);
     } else {
         nSubsidy = MIN_TX_FEE;
     }
 
-    if (fDebugMagi) {
-      double rDiff = GetDifficultyFromBitsV2(pindex0); 
-      printf("@@PoWII-V2 (nHeight, rDiff, rSubsidy) = (%d, %f, %f)\n", 
-      nHeight, rDiff, double(nSubsidy)/double(COIN));
-    }
     if (IsChainInSwitch(pindex0)) nSubsidy = (double)nSubsidy / 25.;
     return nSubsidy + nFees;
 }
@@ -1148,84 +1132,63 @@ int64 GetProofOfWorkReward(int nBits, int nHeight, int64 nFees)
 
     int64 nSubsidy = 0;
     
-    if (fTestNet && (nHeight%2 == 0))
-    {
-	if(nHeight <= 10)
-	{
-	    nSubsidy = 100000 * COIN;
-	    return nSubsidy + nFees;
-	}
-	nSubsidy = (100 * COIN) >> (nHeight / 1051200); // cut in half every 1.05 mil blocks ~2 years
-	if (fDebugMagi) printf("@@GPoWR-testnet nHeight = %d, nSubsidy = %"PRI64d", nDiff = %f\n", 
-	       nHeight, nSubsidy/COIN, nDiff);
-	return nSubsidy + nFees;
-    }
-    
     /*	Notes of 11 premined blocks, totally: 1,237,505 XMG
-	Coins burned: 720,000 XMG https://bchain.info/XMG/addr/93m4hAxmCcGXMfnjVPfNhWSjb69sDziGSY
-				  https://bitcointalk.org/index.php?topic=735170.msg9475622#msg9475622
-	Coins used to push PoM campaign: 112,505 XMG (https://bitcointalk.org/index.php?topic=802681.0)
+    Coins burned: 720,000 XMG https://bchain.info/XMG/addr/93m4hAxmCcGXMfnjVPfNhWSjb69sDziGSY
+                  https://bitcointalk.org/index.php?topic=735170.msg9475622#msg9475622
+    Coins used to push PoM campaign: 112,505 XMG (https://bitcointalk.org/index.php?topic=802681.0)
 
-	Remaining coins are: 404,995 (1.65%), that includes: 
-	Coin swap: 233,319 XMG (0.93%)
-	Leftover: 171,676 XMG (0.69%) - promotion (givaway + bounties for community members' contribution), staff salary
+    Remaining coins are: 404,995 (1.65%), that includes: 
+    Coin swap: 233,319 XMG (0.93%)
+    Leftover: 171,676 XMG (0.69%) - promotion (givaway + bounties for community members' contribution), staff salary
 
-	Coin swap: rule of swap - total coins swapped/Coins in circulation ~ 10% or less
-	Some of posts regarding the coin swap: 
-	https://bitcointalk.org/index.php?topic=821170.0
-	https://bitcointalk.org/index.php?topic=735170.msg8950501#msg8950501
-	https://bitcointalk.org/index.php?topic=735170.msg9111697#msg9111697
-	
-	Details: https://bitcointalk.org/index.php?topic=735170.msg9900074#msg9900074
+    Coin swap: rule of swap - total coins swapped/Coins in circulation ~ 10% or less
+    Some of posts regarding the coin swap: 
+    https://bitcointalk.org/index.php?topic=821170.0
+    https://bitcointalk.org/index.php?topic=735170.msg8950501#msg8950501
+    https://bitcointalk.org/index.php?topic=735170.msg9111697#msg9111697
+    
+    Details: https://bitcointalk.org/index.php?topic=735170.msg9900074#msg9900074
     */
-    if(nHeight <= 10 && !fTestNet)
+    if(nHeight <= 10)
     {
         nSubsidy = 112500 * COIN;
     }
     else if (nHeight <= PRM_MAGI_POW_HEIGHT_V2) // difficulty dependent PoW-I mining
     {
-	if (nHeight <= BLOCK_REWARD_ADJT) {
-	    nSubsidy = 495.05 * pow( (5.55243*(exp_n(-0.3*nDiff/15.762) - exp_n(-0.6*nDiff/15.762)))*nDiff, 0.5) / 8.61553;
-	    if (nSubsidy < 5) nSubsidy = 5;
-	    nSubsidy *= COIN;
-	    if (fDebug && fDebugMagi) printf("@@GPoWR nHeight = %d, nSubsidy = %"PRI64d", nDiff = %f\n", 
-				nHeight, nSubsidy/COIN, nDiff);
-	}
-	else if (nHeight <= BLOCK_REWARD_ADJT_M7M_V2) {
-	    double nDiffcu = ((nHeight <= 2700) ? 2.2 : (2.2+(nHeight-2700)*0.0000274841));
-	    nSubsidy = 294.118 * pow( (5.55243*(exp_n(-0.3*nDiff/0.39) - exp_n(-0.6*nDiff/0.39)))*nDiff, 0.5) / 1.335
-			   * exp_n2(nDiff/0.08, nDiffcu/0.08);
-	    if (nSubsidy < 5) nSubsidy = 5;
-	    nSubsidy *= COIN;
-	    if (fDebug && fDebugMagi) printf("@@GPoWR nHeight = %d, nSubsidy = %"PRI64d", nDiff = %f\n", 
-				nHeight, nSubsidy/COIN, nDiff);
-	}
-	else {
-	    double nDiffcu = ((nHeight <= 2700) ? 2.2 / M7Mv2_SCALE : ( (2.2+(nHeight-2700)*0.0000183227)) / M7Mv2_SCALE );
-	    nSubsidy = 294.118 * pow( (5.55243*(exp_n(-0.3*nDiff/0.39*M7Mv2_SCALE) - exp_n(-0.6*nDiff/0.39*M7Mv2_SCALE)))*nDiff, 0.5) / 0.8456
-			   * exp_n2(nDiff/(0.08/M7Mv2_SCALE), nDiffcu/(0.08/M7Mv2_SCALE));
-	    if (nSubsidy < 5) nSubsidy = 5;
-	    nSubsidy *= COIN;
-	    if (fDebugMagi) printf("@@GPoWR nHeight = %d, nSubsidy = %"PRI64d", nDiff = %f\n", 
-				nHeight, nSubsidy/COIN, nDiff);
-	}
+    if (nHeight <= BLOCK_REWARD_ADJT) {
+        nSubsidy = 495.05 * pow( (5.55243*(exp_n(-0.3*nDiff/15.762) - exp_n(-0.6*nDiff/15.762)))*nDiff, 0.5) / 8.61553;
+        if (nSubsidy < 5) nSubsidy = 5;
+        nSubsidy *= COIN;
+    }
+    else if (nHeight <= BLOCK_REWARD_ADJT_M7M_V2) {
+        double nDiffcu = ((nHeight <= 2700) ? 2.2 : (2.2+(nHeight-2700)*0.0000274841));
+        nSubsidy = 294.118 * pow( (5.55243*(exp_n(-0.3*nDiff/0.39) - exp_n(-0.6*nDiff/0.39)))*nDiff, 0.5) / 1.335
+               * exp_n2(nDiff/0.08, nDiffcu/0.08);
+        if (nSubsidy < 5) nSubsidy = 5;
+        nSubsidy *= COIN;
+    }
+    else {
+        double nDiffcu = ((nHeight <= 2700) ? 2.2 / M7Mv2_SCALE : ( (2.2+(nHeight-2700)*0.0000183227)) / M7Mv2_SCALE );
+        nSubsidy = 294.118 * pow( (5.55243*(exp_n(-0.3*nDiff/0.39*M7Mv2_SCALE) - exp_n(-0.6*nDiff/0.39*M7Mv2_SCALE)))*nDiff, 0.5) / 0.8456
+               * exp_n2(nDiff/(0.08/M7Mv2_SCALE), nDiffcu/(0.08/M7Mv2_SCALE));
+        if (nSubsidy < 5) nSubsidy = 5;
+        nSubsidy *= COIN;
+    }
     }
     else if (nHeight <= END_MAGI_POW_HEIGHT_V2) // difficulty dependent PoW-II mining
     {
-	double nDiffcu = log(nHeight)*0.1;
-	nSubsidy = 50 * pow( (5.55243*(exp_n(-0.3*nDiff/0.39*M7Mv2_SCALE) - exp_n(-0.6*nDiff/0.39*M7Mv2_SCALE)))*nDiff, 0.5) / 0.8456
-			* exp_n2(nDiff/(0.16/M7Mv2_SCALE), nDiffcu/(0.16/M7Mv2_SCALE));
-	if (nSubsidy < 3) nSubsidy = 3;
-	nSubsidy *= COIN;
-	if (fDebug && fDebugMagi) printf("@@GPoWR nHeight = %d, nSubsidy = %"PRI64d", nDiff = %f\n", 
-			    nHeight, nSubsidy/COIN, nDiff);
+    double nDiffcu = log(nHeight)*0.1;
+    nSubsidy = 50 * pow( (5.55243*(exp_n(-0.3*nDiff/0.39*M7Mv2_SCALE) - exp_n(-0.6*nDiff/0.39*M7Mv2_SCALE)))*nDiff, 0.5) / 0.8456
+            * exp_n2(nDiff/(0.16/M7Mv2_SCALE), nDiffcu/(0.16/M7Mv2_SCALE));
+    if (nSubsidy < 3) nSubsidy = 3;
+    nSubsidy *= COIN;
 //	nSubsidy = 15. * 2500. / (pow((nDiff+500.)/10., 2.));
 //	if (nSubsidy < 3) nSubsidy = 3;
 //	nSubsidy *= COIN;
-	for(int i = 525600; i <= nHeight; i += 525600) nSubsidy *= 0.93; // yearly decline (7%)
+    for(int i = 525600; i <= nHeight; i += 525600) nSubsidy *= 0.93; // yearly decline (7%)
     }
     else {
-	nSubsidy = MIN_TX_FEE;
+    nSubsidy = MIN_TX_FEE;
     }
 
     return nSubsidy + nFees;
@@ -1255,7 +1218,7 @@ double GetAnnualInterestV2(int64 nNetWorkWeit, double rMaxAPR, CBlockIndex* pind
     rAPR = ( ( 2./( 1.+exp_n(1./(nNetWorkWeit/rWeit+1.)) ) - 0.53788 ) * rMaxAPR 
            / ( 2./( 1.+exp_n(1./(rWeit+1.)) ) - 0.53788 ) );
     if (pindex0 && IsMaintenance(pindex0)) rAPR *= 1.2;
-    if (fDebugMagiPoS) printf("@PoS-APRV2 rAPR = %f\n", rAPR);
+//    if (fDebugMagiPoS) printf("@PoS-APRV2 rAPR = %f\n", rAPR);
     return rAPR;
 }
 
@@ -1264,16 +1227,10 @@ int64 GetProofOfStakeReward(int64 nCoinAge, int64 nFees, CBlockIndex* pindex)
 {
     int64 nNetWorkWeit = GetPoSKernelPS(pindex);
     double rAPR = (IsPoSIIProtocolV2(pindex->nHeight+1)) ? 
-		  GetAnnualInterestV2(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE, pindex) : 
-		  GetAnnualInterest(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE);
+          GetAnnualInterestV2(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE, pindex) : 
+          GetAnnualInterest(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE);
 
     int64 nSubsidy = nCoinAge * rAPR * COIN * 33 / (365 * 33 + 8);
-
-	if (fDebug && GetBoolArg("-printcreation"))
-        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRI64d" nBits=%d\n", FormatMoney(nSubsidy).c_str(), nCoinAge, pindex->nHeight);
-
-	if (fDebug && fDebugMagi) printf("@@GPoSR nHeight = %d, nSubsidy = %"PRI64d", nCoinAge = %"PRI64d", rAPR = %f\n", 
-				pindex->nHeight, nSubsidy/COIN, nCoinAge, rAPR);
 
     return nSubsidy + nFees;
 }
@@ -1429,13 +1386,13 @@ unsigned int GetNextTargetRequired_v1(const CBlockIndex* pindexLast, bool fProof
         bnNew = bnTargetLimit;
 
     /// debug print
-    if (fDebugMagiPoS)
-    {
-        printf("GetNextTargetRequired RETARGET\n");
-        printf("nTargetSpacing = %"PRI64d"    nActualSpacing = %"PRI64d"    nInterval = %"PRI64d"\n", nTargetSpacing, nActualSpacing, nInterval);
-        printf("Before: %08x  %s\n", pindexPrev->nBits, CBigNum().SetCompact(pindexPrev->nBits).getuint256().ToString().c_str());
-        printf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
-    }
+//    if (fDebugMagiPoS)
+//    {
+//        printf("GetNextTargetRequired RETARGET\n");
+//        printf("nTargetSpacing = %" PRI64d "    nActualSpacing = %" PRI64d "    nInterval = %" PRI64d "\n", nTargetSpacing, nActualSpacing, nInterval);
+//        printf("Before: %08x  %s\n", pindexPrev->nBits, CBigNum().SetCompact(pindexPrev->nBits).getuint256().ToString().c_str());
+//        printf("After:  %08x  %s\n", bnNew.GetCompact(), bnNew.getuint256().ToString().c_str());
+//    }
 
     return bnNew.GetCompact();
 }
@@ -1801,7 +1758,7 @@ unsigned int MagiQuantumWave_v2(const CBlockIndex* pindexLast, bool fProofOfStak
     if (nWeightTot < 1) {
         nWeightTot = 1;
     }
-    if (fDebug) printf("nWeightTot: %d\n", nWeightTot);
+//    if (fDebug) printf("nWeightTot: %d\n", nWeightTot);
 
     bnAverage /= nWeightTot;
 
@@ -1830,10 +1787,8 @@ unsigned int MagiQuantumWave_v2(const CBlockIndex* pindexLast, bool fProofOfStak
 
 unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake)
 {
-    if (fDebug) printf("nHeight: %d\n", pindexLast->nHeight);
     int DiffMode = 1;
-    if (fTestNet) DiffMode = 1;
-    else if (pindexLast->nHeight+1 >= 33500 && pindexLast->nHeight+1 < HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT) DiffMode = 2;
+    if (pindexLast->nHeight+1 >= 33500 && pindexLast->nHeight+1 < HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT) DiffMode = 2;
     else if (pindexLast->nHeight+1 >= HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT && pindexLast->nHeight+1 < HEIGHT_CHAIN_SWITCH-2) DiffMode = 3;
     else if (pindexLast->nHeight+1 >= HEIGHT_CHAIN_SWITCH-2 && pindexLast->nHeight+1 < 1606988) DiffMode = 2;
     else if (pindexLast->nHeight+1 >= 1606988) DiffMode = 4;
