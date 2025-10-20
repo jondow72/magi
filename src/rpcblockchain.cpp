@@ -66,8 +66,8 @@ double GetPoSKernelPS(const CBlockIndex* blockindex, int lookup)
 
         pindex = pindex->pprev;
     }
-    if (fDebugMagi)
-	printf("@GetPoSKernelPS -> stake blocks for average = %d\n", nStakesHandled);
+//    if (fDebugMagi)
+//	printf("@GetPoSKernelPS -> stake blocks for average = %d\n", nStakesHandled);
 
     double result = 0;
 
@@ -115,8 +115,8 @@ double GetPoSKernelPSV2(const CBlockIndex* blockindex, int lookup)
 //	}
     }
     if (nActualBlockTimeTot == 0 || nStakesHandled == 0) return 0;
-    if (fDebugMagi)
-	printf("@GetPoSKernelPSV2 -> aver diff = %f, block time = %f\n", diffTot / (double)nStakesHandled, (double)nActualBlockTimeTot / (double)nStakesHandled);
+//    if (fDebugMagi)
+//	printf("@GetPoSKernelPSV2 -> aver diff = %f, block time = %f\n", diffTot / (double)nStakesHandled, (double)nActualBlockTimeTot / (double)nStakesHandled);
 
     return diffTot*4294967296.0/double(nActualBlockTimeTot);
 }
@@ -157,8 +157,8 @@ double GetPoSKernelPSV3(const CBlockIndex* blockindex)
 	}
     }
     if (nActualBlockTimeTot == 0 || nStakesHandled == 0) return 0;
-    if (fDebugMagi)
-	printf("@GetPoSKernelPSV2 -> aver diff = %f, block time = %f\n", diff / (double)nStakesHandled, (double)nActualBlockTimeTot / (double)nStakesHandled);
+//    if (fDebugMagi)
+//	printf("@GetPoSKernelPSV2 -> aver diff = %f, block time = %f\n", diff / (double)nStakesHandled, (double)nActualBlockTimeTot / (double)nStakesHandled);
 
     return dStakeKernelsTriedAvg / double(nStakesHandled);
 }
