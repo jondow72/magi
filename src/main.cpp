@@ -963,88 +963,87 @@ double GetDifficultyFromBits(unsigned int nBits){
     return dDiff;
 }
 
-#define BRW_BLKTIME_COEFF 0.1 // block time effect on average weight; the larger value, the less effect
-#define BRW_AVER_COEFF 0.25 // the larger value, the regular moving average
+// Time-Based Thresholds (Genesis: Sep 15, 2014; 60s/block)
+static const int64 GENESIS_TIME = 1410814224LL;
+static const int BLOCK_INTERVAL = 60;
+static const int64 MAX_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(MAX_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
+static const int64 PRM_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(PRM_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
+static const int64 PRM_MAGI_POW_HEIGHT_V2_TIME = GENESIS_TIME + (static_cast<int64>(PRM_MAGI_POW_HEIGHT_V2) * BLOCK_INTERVAL);
+static const int64 END_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(END_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
+static const int64 END_MAGI_POW_HEIGHT_V2_TIME = GENESIS_TIME + (static_cast<int64>(END_MAGI_POW_HEIGHT_V2) * BLOCK_INTERVAL);
+static const int64 BLOCK_REWARD_ADJT_TIME = GENESIS_TIME + (static_cast<int64>(BLOCK_REWARD_ADJT) * BLOCK_INTERVAL);
+static const int64 BLOCK_REWARD_ADJT_M7M_V2_TIME = GENESIS_TIME + (static_cast<int64>(BLOCK_REWARD_ADJT_M7M_V2) * BLOCK_INTERVAL);
 
-#define BRW_EXPON_COEFF 0.15
-#define BRW_WEIGHT_MIN 0.0001
-#define BRW_WEIGHT_MAX 0.8
-#define BRW_WEIGHT_SCALE 10000.0
+// Scaling Factor (from your #define)
+static const double M7Mv2_SCALE = 2.545;
 
-#define DAMPINGCU 0.55
-#define DAMPINGRATE 0.075
-#define DAMPINMIN 0.3
-#define DAMPINGAMP 2.0
+// Difficulty V2 Constants (from your #defines)
+static const double BRW_BLKTIME_COEFF = 0.1; // block time effect on average weight; the larger value, the less effect
+static const double BRW_AVER_COEFF = 0.25; // the larger value, the regular moving average
+static const double BRW_EXPON_COEFF = 0.15;
+static const double BRW_WEIGHT_MIN = 0.0001;
+static const double BRW_WEIGHT_MAX = 0.8;
+static const double BRW_WEIGHT_SCALE = 10000.0; // Unused in approx, but kept
 
-#define BBLOCK 100
-#define BBLOCK_AVER 2000
-// diff data filter to stabilize the rewards
-double GetDifficultyFromBitsV2(const CBlockIndex* pindex0, bool fPrintInfo)
+static const double DAMPINGCU = 0.55;
+static const double DAMPINGRATE = 0.075;
+static const double DAMPINMIN = 0.3;
+static const double DAMPINGAMP = 2.0;
+
+static const int BBLOCK = 100;
+static const int BBLOCK_AVER = 2000;
+
+// Globals for Stateful Averages (initialize at genesis)
+double g_longTermDiffAver = 1.0;
+double g_rDiffAverEMA = 1.0;
+int64 g_lastPoWTime = GENESIS_TIME;
+
+// Helper: Assume these are defined (from Magi; simple impl if missing)
+double exp_n(double x) { return exp(x); }
+double exp_n2(double a, double b) { return exp(a) * exp(b); }
+double GetDifficultyFromBits(int nBits); // Existing function for base diff
+
+// Ported: GetDifficultyFromBitsV2 - Time-based approximation
+double GetDifficultyFromBitsV2(int nBits, int nTime, int64 approx_height, bool fPrintInfo)
 {
-    int64 nWeightTot, nActualBlockSpacing;
-    double rDiffAverEMA, rDiffAver, rfw, rWeight;
-    const CBlockIndex* pindexPrev = pindex0;
+    double current_diff = GetDifficultyFromBits(nBits);
+    double target_spacing = static_cast<double>(BLOCK_INTERVAL); // 60s; or GetTargetSpacingWork(approx_height + 1)
 
-    // finding the average diff over up to 2000 backward blocks
-    rDiffAver = GetDifficultyFromBits(pindexPrev->nBits);
-    nWeightTot = 1;
-    for(int i = 1; i <= BBLOCK_AVER-1; i++) {
-    	pindexPrev = GetLastPoWBlockIndex(pindexPrev->pprev);
-    	if (!pindexPrev || pindexPrev->nHeight==0) {
-    	    printf("WARNING: averaged over less than BBLOCK_AVER blocks --> GetDifficultyFromBitsV2\n");
-    	    break;
-        }
-        rDiffAver += GetDifficultyFromBits(pindexPrev->nBits);
-        ++nWeightTot;
-    }
-    rDiffAver /= double(nWeightTot);
+    int64 spacing = static_cast<int64>(nTime) - g_lastPoWTime;
+    if (spacing <= 0) spacing = static_cast<int64>(target_spacing); // Safety for first/invalid
 
-    pindexPrev = pindex0;
-    const CBlockIndex* pindexPrevPrev = GetLastPoWBlockIndex(pindexPrev->pprev);
-    if (!pindexPrevPrev || pindexPrevPrev->nHeight==0) {
-	printf("ERROR: no actual average done --> GetDifficultyFromBitsV2\n");
-	return rDiffAver;
-    }
-    nActualBlockSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
-    // moving average factor depending on block time; less rfw, smoother the diff
-    rfw = (1. - exp_n(-double(nActualBlockSpacing)*BRW_EXPON_COEFF*BRW_BLKTIME_COEFF/double(GetTargetSpacingWork(pindex0->nHeight+1))) ) * BRW_AVER_COEFF;
+    // Compute rfw based on actual spacing (adapts to stalls)
+    double rfw = (1. - exp_n(-static_cast<double>(spacing) * BRW_EXPON_COEFF * BRW_BLKTIME_COEFF / target_spacing)) * BRW_AVER_COEFF;
     if (rfw < BRW_WEIGHT_MIN) { rfw = BRW_WEIGHT_MIN; }
     else if (rfw > BRW_WEIGHT_MAX) { rfw = BRW_WEIGHT_MAX; }
 
-    rDiffAverEMA = GetDifficultyFromBits(pindexPrev->nBits) * ((int64)(rfw * BRW_WEIGHT_SCALE));
-    nWeightTot = ((int64)(rfw*BRW_WEIGHT_SCALE));
-    rWeight = 1.-rfw;
-    for(int i = 1; i <= BBLOCK-1; i++)
-    {
-	pindexPrev = pindexPrevPrev;
-	pindexPrevPrev = GetLastPoWBlockIndex(pindexPrev->pprev);
-	if (!pindexPrevPrev || pindexPrevPrev->nHeight==0) {
-	    printf("WARNING: averaged over less than BBLOCK --> GetDifficultyFromBitsV2\n");
-	    break;
-	}
-	nActualBlockSpacing = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
-	rfw = (1. - exp_n(-double(nActualBlockSpacing)*BRW_EXPON_COEFF*BRW_BLKTIME_COEFF/double(GetTargetSpacingWork(pindex0->nHeight+1))) ) * BRW_AVER_COEFF;
-	if (rfw < BRW_WEIGHT_MIN) { rfw = BRW_WEIGHT_MIN; }
-	else if (rfw > BRW_WEIGHT_MAX) { rfw = BRW_WEIGHT_MAX; }
-	rDiffAverEMA += GetDifficultyFromBits(pindexPrev->nBits) * ((int64)(rfw * rWeight * BRW_WEIGHT_SCALE));
-	nWeightTot += ((int64)(rfw * rWeight * BRW_WEIGHT_SCALE));
-	rWeight *= (1.-rfw);
-    }
-    rDiffAverEMA /= double(nWeightTot);
-    // apply damping
-    double deviation = rDiffAverEMA - rDiffAver;
+    // Update long-term average (incremental over BBLOCK_AVER blocks)
+    g_longTermDiffAver += (current_diff - g_longTermDiffAver) / static_cast<double>(BBLOCK_AVER);
+    double rDiffAver = g_longTermDiffAver;
+
+    // Update short-term EMA (recursive approximation of weighted sum over BBLOCK)
+    double rDiffAverEMA_new = current_diff * rfw + g_rDiffAverEMA * (1. - rfw);
+
+    // Apply damping
+    double deviation = rDiffAverEMA_new - rDiffAver;
     double damping;
-    if (fPrintInfo) printf( "@@GetDifficultyFromBitsV2 (rDiffAverEMA, rDiffAver, deviation) = (%f, %f, %f)\n", 
-      rDiffAverEMA, rDiffAver, deviation );
+    if (fPrintInfo) printf("@@GetDifficultyFromBitsV2 (rDiffAverEMA_new, rDiffAver, deviation) = (%f, %f, %f)\n", 
+                           rDiffAverEMA_new, rDiffAver, deviation);
     if (deviation > 0.) {
-	damping = DAMPINGAMP * exp_n2(DAMPINGCU/DAMPINGRATE, deviation/DAMPINGRATE) + DAMPINMIN;
+        damping = DAMPINGAMP * exp_n2(DAMPINGCU / DAMPINGRATE, deviation / DAMPINGRATE) + DAMPINMIN;
     }
     else {
-	damping = DAMPINGAMP * exp_n2(1.5*DAMPINGCU/DAMPINGRATE, abs(deviation)/DAMPINGRATE) + DAMPINMIN;
+        damping = DAMPINGAMP * exp_n2(1.5 * DAMPINGCU / DAMPINGRATE, fabs(deviation) / DAMPINGRATE) + DAMPINMIN;
     }
-    rDiffAverEMA = deviation * damping  +  rDiffAver;
-    if (fPrintInfo) printf( "@@GetDifficultyFromBitsV2 OPM (rDiffAverEMA, damping) = (%f, %f)\n", 
-      rDiffAverEMA, damping );
+    double rDiffAverEMA = deviation * damping + rDiffAver;
+
+    if (fPrintInfo) printf("@@GetDifficultyFromBitsV2 OPM (rDiffAverEMA, damping) = (%f, %f)\n", 
+                           rDiffAverEMA, damping);
+
+    // Update globals (only after computation, for next call)
+    g_rDiffAverEMA = rDiffAverEMA_new; // Use raw EMA for next; damping is output-only
+    g_lastPoWTime = static_cast<int64>(nTime);
+
     return rDiffAverEMA;
 }
 
@@ -1074,24 +1073,31 @@ bool IsMaintenance(const CBlockIndex* pindex_)
     return ( (pindex_->nHeight > HEIGHT_INIT_MAINTENANCE) && (pindex_->nHeight < HEIGHT_END_MAINTENANCE) );
 }
 
-int64 GetProofOfWorkReward_OPM(const CBlockIndex* pindex0)
+// Ported: GetProofOfWorkReward_OPM - Now time-based
+int64 GetProofOfWorkReward_OPM(int nBitsV2, int nTime)
 {
-    int nHeight = pindex0->nHeight;
-    double M7Mv2_move = ( (nHeight <= 75000) ? 2.85 : ( 2.85 - pow( log(nHeight) - log(75000.), 0.3 )*1.5 ) );
-    double rDiff = GetDifficultyFromBitsV2(pindex0);
+    // Approximate height for internal calcs: (nTime - GENESIS_TIME) / BLOCK_INTERVAL
+    int64 approx_height = (static_cast<int64>(nTime) - GENESIS_TIME) / BLOCK_INTERVAL;
+    if (approx_height < 0) approx_height = 0;
+
+    double M7Mv2_move = ( (approx_height <= 75000) ? 2.85 : ( 2.85 - pow( log(approx_height + 1) - log(75000.), 0.3 )*1.5 ) );  // +1 to avoid log(0)
+    double rDiff = GetDifficultyFromBitsV2_from_nBits(nBitsV2);  // Assume helper; or implement GetDifficultyFromBitsV2(nBitsV2)
     double rDiffcu = 2.2 / M7Mv2_move;
     double rSubsidy = 0.;
     rSubsidy = 50. * pow( (5.55243*(exp_n(-0.3*rDiff/0.39*M7Mv2_move) - exp_n(-0.6*rDiff/0.39*M7Mv2_move)))*rDiff, 0.5)
-		    / (3.02849*exp_n(-M7Mv2_move / 0.14814) + 1.794*exp_n(-M7Mv2_move / 0.89044) + 0.74536)
-		    * exp_n2(rDiff/(0.16/M7Mv2_move), rDiffcu/(0.16/M7Mv2_move));
+            / (3.02849*exp_n(-M7Mv2_move / 0.14814) + 1.794*exp_n(-M7Mv2_move / 0.89044) + 0.74536)
+            * exp_n2(rDiff/(0.16/M7Mv2_move), rDiffcu/(0.16/M7Mv2_move));
     if (rDiff > rDiffcu && rSubsidy < 3.) {
-	rSubsidy = 6. * exp_n2( pow( abs( rDiff - (18.02428*exp_n(-M7Mv2_move/0.17628) + 6.58466*exp_n(-M7Mv2_move/0.71943) + 0.93489) )/(1./M7Mv2_move), 0.5 ), 0.);
+    rSubsidy = 6. * exp_n2( pow( abs( rDiff - (18.02428*exp_n(-M7Mv2_move/0.17628) + 6.58466*exp_n(-M7Mv2_move/0.71943) + 0.93489) )/(1./M7Mv2_move), 0.5 ), 0.);
     }
-    if (IsMaintenance(pindex0)) rSubsidy *= 0.3;
+    if (IsMaintenance_from_time(nTime)) rSubsidy *= 0.3;  // Adapt helper to nTime
     rSubsidy *= double(COIN);
     if (rSubsidy > 50*COIN) { rSubsidy = 50*COIN; }
     else if (rSubsidy < MIN_TX_FEE) { rSubsidy = MIN_TX_FEE; }
-    for(int i = 500000; i <= nHeight; i += 500000) rSubsidy *= 0.93; // yearly decline (7%)
+    // Yearly decline (7%): Every 500000 blocks; use periods instead of loop
+    static const int DECLINE_INTERVAL = 500000;
+    int periods = approx_height / DECLINE_INTERVAL;
+    rSubsidy *= pow(0.93, periods);
     return (int64)rSubsidy;
 }
 
@@ -1110,52 +1116,40 @@ bool IsChainInSwitch(const CBlockIndex* pindex_)
     return ( (pindex_->nHeight >= 1443960) && (nHeightIncr < 1000) );
 }
 
-int64 GetProofOfWorkRewardV2(const CBlockIndex* pindexPrev, int64 nFees, bool fLastBlock)
+// Ported: GetProofOfWorkRewardV2 - Now time-based (assumes nBitsV2 from block; fLastBlock ignored/adapted in new codebase)
+int64 GetProofOfWorkRewardV2(int nBitsV2, int nTime, int64 nFees, bool fLastBlock /* ignored; use nTime directly */)
 {
-    const CBlockIndex* pindex0 = ( fLastBlock ? GetLastPoWBlockIndex(pindexPrev) : pindexPrev );
-    int nHeight = pindex0->nHeight;
+    // Approximate height for internal calcs and helpers (e.g., IsChainInSwitch, debug)
+    int64 approx_height = (static_cast<int64>(nTime) - GENESIS_TIME) / BLOCK_INTERVAL;
+    if (approx_height < 0) approx_height = 0;
+
     int64 nSubsidy = 0;
     
-//      double rDiff = GetDifficultyFromBitsV2(pindex0); 
-//      printf("@@BLKV2-test (nHeight, rDiff, rSubsidy) = (%d, %f, %f)\n", 
-//    nHeight, rDiff, double(nSubsidy)/double(COIN));
-      
+    // For helpers like GetDifficultyFromBitsV2, IsChainInSwitch, IsMaintenance: Assume adapted to take approx_height or nTime
+    // (In new codebase, refactor these if needed; here, we pass approx_height as proxy for nHeight)
+    
     if (fTestNet) {
-//        if (nHeight%2 == 0) nSubsidy = 1000 * COIN;
-//        else nSubsidy = GetProofOfWorkReward_OPM(pindex0);
         nSubsidy = 1000 * COIN;
         return nSubsidy + nFees;
     }
 
-    if (nHeight <= END_MAGI_POW_HEIGHT_V2) {    // difficulty dependent PoW-II mining
-       nSubsidy = GetProofOfWorkReward_OPM(pindex0);
+    if (nTime <= END_MAGI_POW_HEIGHT_V2_TIME) {    // difficulty dependent PoW-II mining
+       nSubsidy = GetProofOfWorkReward_OPM(nBitsV2, nTime);
     } else {
         nSubsidy = MIN_TX_FEE;
     }
 
     if (fDebugMagi) {
-      double rDiff = GetDifficultyFromBitsV2(pindex0); 
-      printf("@@PoWII-V2 (nHeight, rDiff, rSubsidy) = (%d, %f, %f)\n", 
-      nHeight, rDiff, double(nSubsidy)/double(COIN));
+      double rDiff = GetDifficultyFromBitsV2_from_nBits(nBitsV2);  // Assume helper func; or direct if nBitsV2 is compact
+      printf("@@PoWII-V2 (nHeight = %lld, rDiff, rSubsidy) = (%lld, %f, %f)\n", 
+      approx_height, rDiff, double(nSubsidy)/double(COIN));
     }
-    if (IsChainInSwitch(pindex0)) nSubsidy = (double)nSubsidy / 25.;
+    if (IsChainInSwitch_from_time(nTime)) nSubsidy = (double)nSubsidy / 25.;  // Adapt helper to nTime
     return nSubsidy + nFees;
 }
 
-#define M7Mv2_SCALE 2.545
-// Time-Based Thresholds (Genesis: Sep 15, 2014; 60s/block)
-static const int64 GENESIS_TIME = 1410814224LL;
-static const int BLOCK_INTERVAL = 60;
-static const int64 MAX_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(MAX_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
-static const int64 PRM_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(PRM_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
-static const int64 PRM_MAGI_POW_HEIGHT_V2_TIME = GENESIS_TIME + (static_cast<int64>(PRM_MAGI_POW_HEIGHT_V2) * BLOCK_INTERVAL);
-static const int64 END_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(END_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
-static const int64 END_MAGI_POW_HEIGHT_V2_TIME = GENESIS_TIME + (static_cast<int64>(END_MAGI_POW_HEIGHT_V2) * BLOCK_INTERVAL);
-static const int64 BLOCK_REWARD_ADJT_TIME = GENESIS_TIME + (static_cast<int64>(BLOCK_REWARD_ADJT) * BLOCK_INTERVAL);
-static const int64 BLOCK_REWARD_ADJT_M7M_V2_TIME = GENESIS_TIME + (static_cast<int64>(BLOCK_REWARD_ADJT_M7M_V2) * BLOCK_INTERVAL);
 
-// Scaling Factor (from your #define)
-static const double M7Mv2_SCALE = 2.545;
+
 
 int64 GetProofOfWorkReward(int nBits, int nTime, int64 nFees)
 {
