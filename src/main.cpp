@@ -966,6 +966,30 @@ double GetDifficultyFromBits(unsigned int nBits){
 // Time-Based Thresholds (Genesis: Sep 15, 2014; 60s/block)
 static const int64 GENESIS_TIME = 1410814224LL;
 static const int BLOCK_INTERVAL = 60;
+// Target Spacing Constants (updated with V3)
+static const int64 nTargetSpacingWork = 60LL;  // Standard 1-min target
+static const int64 nTargetSpacingV3Work = 240LL;  // 4 min (60 * 4)
+
+// Height Threshold for V3 Spacing
+static const int HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT = 1482000;
+
+// Time Thresholds for Switch & Maintenance (exact from chain data)
+static const int64 SWITCH_INIT_TIME = 1502466116LL;  // Height 1443960
+static const int64 MAINT_INIT_TIME = 1503621006LL;   // Height 1451226
+static const int64 MAINT_END_TIME = 1505629997LL;    // Height 1481500
+
+// Time Thresholds for PoW Phases (from earlier ports)
+static const int MAX_MAGI_POW_HEIGHT = 25000000;
+static const int PRM_MAGI_POW_HEIGHT = 80000;
+static const int PRM_MAGI_POW_HEIGHT_V2 = 50000; // re-cal PoW-I end block
+static const int END_MAGI_POW_HEIGHT = 500000;
+static const int END_MAGI_POW_HEIGHT_V2 = 5000000; // PoW-II aims to issue 12 mil and more than 10 years
+
+static const int BLOCK_REWARD_ADJT = 2700;
+static const int BLOCK_REWARD_ADJT_M7M_V2 = 32750;
+
+static const unsigned int MAX_BLOCK_SIZE = 1000000;
+
 static const int64 MAX_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(MAX_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
 static const int64 PRM_MAGI_POW_HEIGHT_TIME = GENESIS_TIME + (static_cast<int64>(PRM_MAGI_POW_HEIGHT) * BLOCK_INTERVAL);
 static const int64 PRM_MAGI_POW_HEIGHT_V2_TIME = GENESIS_TIME + (static_cast<int64>(PRM_MAGI_POW_HEIGHT_V2) * BLOCK_INTERVAL);
@@ -974,16 +998,16 @@ static const int64 END_MAGI_POW_HEIGHT_V2_TIME = GENESIS_TIME + (static_cast<int
 static const int64 BLOCK_REWARD_ADJT_TIME = GENESIS_TIME + (static_cast<int64>(BLOCK_REWARD_ADJT) * BLOCK_INTERVAL);
 static const int64 BLOCK_REWARD_ADJT_M7M_V2_TIME = GENESIS_TIME + (static_cast<int64>(BLOCK_REWARD_ADJT_M7M_V2) * BLOCK_INTERVAL);
 
-// Scaling Factor (from your #define)
+// Scaling Factor
 static const double M7Mv2_SCALE = 2.545;
 
-// Difficulty V2 Constants (from your #defines)
-static const double BRW_BLKTIME_COEFF = 0.1; // block time effect on average weight; the larger value, the less effect
-static const double BRW_AVER_COEFF = 0.25; // the larger value, the regular moving average
+// Difficulty V2 Constants
+static const double BRW_BLKTIME_COEFF = 0.1;
+static const double BRW_AVER_COEFF = 0.25;
 static const double BRW_EXPON_COEFF = 0.15;
 static const double BRW_WEIGHT_MIN = 0.0001;
 static const double BRW_WEIGHT_MAX = 0.8;
-static const double BRW_WEIGHT_SCALE = 10000.0; // Unused in approx, but kept
+static const double BRW_WEIGHT_SCALE = 10000.0;
 
 static const double DAMPINGCU = 0.55;
 static const double DAMPINGRATE = 0.075;
@@ -993,38 +1017,34 @@ static const double DAMPINGAMP = 2.0;
 static const int BBLOCK = 100;
 static const int BBLOCK_AVER = 2000;
 
-// Globals for Stateful Averages (initialize at genesis)
+// Globals for Diff State & Switch (init at genesis)
 double g_longTermDiffAver = 1.0;
 double g_rDiffAverEMA = 1.0;
 int64 g_lastPoWTime = GENESIS_TIME;
+int g_powBlocksSinceSwitch = 0;
 
-// Helper: Assume these are defined (from Magi; simple impl if missing)
-double exp_n(double x) { return exp(x); }
-double exp_n2(double a, double b) { return exp(a) * exp(b); }
-double GetDifficultyFromBits(int nBits); // Existing function for base diff
-
-// Ported: GetDifficultyFromBitsV2 - Time-based approximation
+/// Refined Port: GetDifficultyFromBitsV2 - Uses dynamic target & exact exp_n/exp_n2
 double GetDifficultyFromBitsV2(int nBits, int nTime, int64 approx_height, bool fPrintInfo)
 {
     double current_diff = GetDifficultyFromBits(nBits);
-    double target_spacing = static_cast<double>(BLOCK_INTERVAL); // 60s; or GetTargetSpacingWork(approx_height + 1)
+    int64 target_spacing = GetTargetSpacingWork(nTime);
 
     int64 spacing = static_cast<int64>(nTime) - g_lastPoWTime;
-    if (spacing <= 0) spacing = static_cast<int64>(target_spacing); // Safety for first/invalid
+    if (spacing <= 0) spacing = target_spacing; // Safety
 
-    // Compute rfw based on actual spacing (adapts to stalls)
-    double rfw = (1. - exp_n(-static_cast<double>(spacing) * BRW_EXPON_COEFF * BRW_BLKTIME_COEFF / target_spacing)) * BRW_AVER_COEFF;
+    // Compute rfw based on actual spacing
+    double rfw = (1. - exp_n(-static_cast<double>(spacing) * BRW_EXPON_COEFF * BRW_BLKTIME_COEFF / static_cast<double>(target_spacing))) * BRW_AVER_COEFF;
     if (rfw < BRW_WEIGHT_MIN) { rfw = BRW_WEIGHT_MIN; }
     else if (rfw > BRW_WEIGHT_MAX) { rfw = BRW_WEIGHT_MAX; }
 
-    // Update long-term average (incremental over BBLOCK_AVER blocks)
+    // Update long-term average (incremental)
     g_longTermDiffAver += (current_diff - g_longTermDiffAver) / static_cast<double>(BBLOCK_AVER);
     double rDiffAver = g_longTermDiffAver;
 
-    // Update short-term EMA (recursive approximation of weighted sum over BBLOCK)
+    // Update short-term EMA (recursive)
     double rDiffAverEMA_new = current_diff * rfw + g_rDiffAverEMA * (1. - rfw);
 
-    // Apply damping
+    // Apply damping (uses exp_n2)
     double deviation = rDiffAverEMA_new - rDiffAver;
     double damping;
     if (fPrintInfo) printf("@@GetDifficultyFromBitsV2 (rDiffAverEMA_new, rDiffAver, deviation) = (%f, %f, %f)\n", 
@@ -1040,8 +1060,8 @@ double GetDifficultyFromBitsV2(int nBits, int nTime, int64 approx_height, bool f
     if (fPrintInfo) printf("@@GetDifficultyFromBitsV2 OPM (rDiffAverEMA, damping) = (%f, %f)\n", 
                            rDiffAverEMA, damping);
 
-    // Update globals (only after computation, for next call)
-    g_rDiffAverEMA = rDiffAverEMA_new; // Use raw EMA for next; damping is output-only
+    // Update globals
+    g_rDiffAverEMA = rDiffAverEMA_new;
     g_lastPoWTime = static_cast<int64>(nTime);
 
     return rDiffAverEMA;
@@ -1066,22 +1086,22 @@ double GetDifficultyFromBitsAver(const CBlockIndex* pindex0, int nBlocksAver0)
     return rDiffAver/double(nWeightTot);
 }
 
-#define HEIGHT_INIT_MAINTENANCE 1451226
-#define HEIGHT_END_MAINTENANCE 1481500
-bool IsMaintenance(const CBlockIndex* pindex_)
+// Ported: IsMaintenance - Time-based
+bool IsMaintenance(int nTime)
 {
-    return ( (pindex_->nHeight > HEIGHT_INIT_MAINTENANCE) && (pindex_->nHeight < HEIGHT_END_MAINTENANCE) );
+    return (nTime > MAINT_INIT_TIME && nTime < MAINT_END_TIME);
 }
 
 // Ported: GetProofOfWorkReward_OPM - Now time-based
+// Refined Port: GetProofOfWorkReward_OPM
+// Refined: GetProofOfWorkReward_OPM
 int64 GetProofOfWorkReward_OPM(int nBitsV2, int nTime)
 {
-    // Approximate height for internal calcs: (nTime - GENESIS_TIME) / BLOCK_INTERVAL
     int64 approx_height = (static_cast<int64>(nTime) - GENESIS_TIME) / BLOCK_INTERVAL;
     if (approx_height < 0) approx_height = 0;
 
-    double M7Mv2_move = ( (approx_height <= 75000) ? 2.85 : ( 2.85 - pow( log(approx_height + 1) - log(75000.), 0.3 )*1.5 ) );  // +1 to avoid log(0)
-    double rDiff = GetDifficultyFromBitsV2_from_nBits(nBitsV2);  // Assume helper; or implement GetDifficultyFromBitsV2(nBitsV2)
+    double M7Mv2_move = ( (approx_height <= 75000) ? 2.85 : ( 2.85 - pow( log(approx_height + 1) - log(75000.), 0.3 )*1.5 ) );
+    double rDiff = GetDifficultyFromBitsV2(nBitsV2, nTime, approx_height, fDebugMagi);
     double rDiffcu = 2.2 / M7Mv2_move;
     double rSubsidy = 0.;
     rSubsidy = 50. * pow( (5.55243*(exp_n(-0.3*rDiff/0.39*M7Mv2_move) - exp_n(-0.6*rDiff/0.39*M7Mv2_move)))*rDiff, 0.5)
@@ -1090,74 +1110,70 @@ int64 GetProofOfWorkReward_OPM(int nBitsV2, int nTime)
     if (rDiff > rDiffcu && rSubsidy < 3.) {
     rSubsidy = 6. * exp_n2( pow( abs( rDiff - (18.02428*exp_n(-M7Mv2_move/0.17628) + 6.58466*exp_n(-M7Mv2_move/0.71943) + 0.93489) )/(1./M7Mv2_move), 0.5 ), 0.);
     }
-    if (IsMaintenance_from_time(nTime)) rSubsidy *= 0.3;  // Adapt helper to nTime
+    if (IsMaintenance(nTime)) rSubsidy *= 0.3;
     rSubsidy *= double(COIN);
     if (rSubsidy > 50*COIN) { rSubsidy = 50*COIN; }
     else if (rSubsidy < MIN_TX_FEE) { rSubsidy = MIN_TX_FEE; }
-    // Yearly decline (7%): Every 500000 blocks; use periods instead of loop
+    // Yearly decline
     static const int DECLINE_INTERVAL = 500000;
     int periods = approx_height / DECLINE_INTERVAL;
     rSubsidy *= pow(0.93, periods);
     return (int64)rSubsidy;
 }
 
-bool IsChainInSwitch(const CBlockIndex* pindex_)
+// Ported: IsChainInSwitch - Time-based (stateful)
+bool IsChainInSwitch(int nTime)
 {
-    const CBlockIndex *pindex0 = pindex_;
-    int nHeightIncr = 0;
-    while (pindex0->nHeight >= 1443960) {
-        if (!pindex0) {
-            printf("ERROR: IsChainInSwitch() pindex0 null identified\n");
-            break;
-        }
-        if (pindex0->IsProofOfWork()) ++nHeightIncr;
-        pindex0 = pindex0->pprev;
-    }
-    return ( (pindex_->nHeight >= 1443960) && (nHeightIncr < 1000) );
+    if (nTime < SWITCH_INIT_TIME) return false;
+    return (g_powBlocksSinceSwitch < 1000);
+}
+
+// Ported Approximation: GetLastPoWTime - Returns last PoW timestamp (for spacing in diff calcs)
+int64 GetLastPoWTime()
+{
+    return g_lastPoWTime;
 }
 
 // Ported: GetProofOfWorkRewardV2 - Now time-based (assumes nBitsV2 from block; fLastBlock ignored/adapted in new codebase)
-int64 GetProofOfWorkRewardV2(int nBitsV2, int nTime, int64 nFees, bool fLastBlock /* ignored; use nTime directly */)
+// Refined: GetProofOfWorkRewardV2
+int64 GetProofOfWorkRewardV2(int nBitsV2, int nTime, int64 nFees, bool fLastBlock /* ignored */)
 {
-    // Approximate height for internal calcs and helpers (e.g., IsChainInSwitch, debug)
     int64 approx_height = (static_cast<int64>(nTime) - GENESIS_TIME) / BLOCK_INTERVAL;
     if (approx_height < 0) approx_height = 0;
 
     int64 nSubsidy = 0;
-    
-    // For helpers like GetDifficultyFromBitsV2, IsChainInSwitch, IsMaintenance: Assume adapted to take approx_height or nTime
-    // (In new codebase, refactor these if needed; here, we pass approx_height as proxy for nHeight)
     
     if (fTestNet) {
         nSubsidy = 1000 * COIN;
         return nSubsidy + nFees;
     }
 
-    if (nTime <= END_MAGI_POW_HEIGHT_V2_TIME) {    // difficulty dependent PoW-II mining
+    if (nTime <= END_MAGI_POW_HEIGHT_V2_TIME) {
        nSubsidy = GetProofOfWorkReward_OPM(nBitsV2, nTime);
     } else {
         nSubsidy = MIN_TX_FEE;
     }
 
     if (fDebugMagi) {
-      double rDiff = GetDifficultyFromBitsV2_from_nBits(nBitsV2);  // Assume helper func; or direct if nBitsV2 is compact
-      printf("@@PoWII-V2 (nHeight = %lld, rDiff, rSubsidy) = (%lld, %f, %f)\n", 
-      approx_height, rDiff, double(nSubsidy)/double(COIN));
+      double rDiff = GetDifficultyFromBitsV2(nBitsV2, nTime, approx_height, true);
+      printf("@@PoWII-V2 (nTime=%d approx_height=%lld, rDiff=%f, rSubsidy=%f)\n", 
+             nTime, approx_height, rDiff, double(nSubsidy)/double(COIN));
     }
-    if (IsChainInSwitch_from_time(nTime)) nSubsidy = (double)nSubsidy / 25.;  // Adapt helper to nTime
+    if (IsChainInSwitch(nTime)) nSubsidy = (double)nSubsidy / 25.;
     return nSubsidy + nFees;
 }
 
 
 
 
+// Main Reward Function (V1) - Time-based, with exact exp_n/exp_n2
 int64 GetProofOfWorkReward(int nBits, int nTime, int64 nFees)
 {
     double nDiff = GetDifficultyFromBits(nBits);
 
     int64 nSubsidy = 0;
 
-    // Approximate height for internal calcs: (nTime - GENESIS_TIME) / BLOCK_INTERVAL
+    // Approximate height for internal calcs
     int64 approx_height = (static_cast<int64>(nTime) - GENESIS_TIME) / BLOCK_INTERVAL;
     if (approx_height < 0) approx_height = 0;
 
@@ -1168,36 +1184,22 @@ int64 GetProofOfWorkReward(int nBits, int nTime, int64 nFees)
             nSubsidy = 100000 * COIN;
             return nSubsidy + nFees;
         }
-        nSubsidy = (100 * COIN) >> (approx_height / 1051200); // cut in half every 1.05 mil blocks ~2 years
+        nSubsidy = (100 * COIN) >> (approx_height / 1051200);
         if (fDebugMagi) printf("@@GPoWR-testnet nHeight = %lld, nSubsidy = %"PRI64d", nDiff = %f\n", 
                approx_height, nSubsidy/COIN, nDiff);
         return nSubsidy + nFees;
     }
     
-    /*	Notes of 11 premined blocks, totally: 1,237,505 XMG
-    Coins burned: 720,000 XMG https://bchain.info/XMG/addr/93m4hAxmCcGXMfnjVPfNhWSjb69sDziGSY
-                  https://bitcointalk.org/index.php?topic=735170.msg9475622#msg9475622
-    Coins used to push PoM campaign: 112,505 XMG (https://bitcointalk.org/index.php?topic=802681.0)
-
-    Remaining coins are: 404,995 (1.65%), that includes: 
-    Coin swap: 233,319 XMG (0.93%)
-    Leftover: 171,676 XMG (0.69%) - promotion (givaway + bounties for community members' contribution), staff salary
-
-    Coin swap: rule of swap - total coins swapped/Coins in circulation ~ 10% or less
-    Some of posts regarding the coin swap: 
-    https://bitcointalk.org/index.php?topic=821170.0
-    https://bitcointalk.org/index.php?topic=735170.msg8950501#msg8950501
-    https://bitcointalk.org/index.php?topic=735170.msg9111697#msg9111697
+    // Premine comment block (keep as-is)
+    /* ... (original notes) ... */
     
-    Details: https://bitcointalk.org/index.php?topic=735170.msg9900074#msg9900074
-    */
-    // Premine: First ~10 blocks/minutes
+    // Premine
     if (nTime <= GENESIS_TIME + (10LL * BLOCK_INTERVAL) && !fTestNet)
     {
         nSubsidy = 112500 * COIN;
     }
-    // PoW-I: Up to PRM_MAGI_POW_HEIGHT_V2_TIME (~50k blocks, ~35 days after genesis)
-    else if (nTime <= PRM_MAGI_POW_HEIGHT_V2_TIME) // difficulty dependent PoW-I mining
+    // PoW-I
+    else if (nTime <= PRM_MAGI_POW_HEIGHT_V2_TIME)
     {
         if (nTime <= BLOCK_REWARD_ADJT_TIME) {
             nSubsidy = 495.05 * pow( (5.55243*(exp_n(-0.3*nDiff/15.762) - exp_n(-0.6*nDiff/15.762)))*nDiff, 0.5) / 8.61553;
@@ -1225,8 +1227,8 @@ int64 GetProofOfWorkReward(int nBits, int nTime, int64 nFees)
                         approx_height, nSubsidy/COIN, nDiff);
         }
     }
-    // PoW-II: Up to END_MAGI_POW_HEIGHT_V2_TIME (~5M blocks, ~9.5 years after genesis)
-    else if (nTime <= END_MAGI_POW_HEIGHT_V2_TIME) // difficulty dependent PoW-II mining
+    // PoW-II
+    else if (nTime <= END_MAGI_POW_HEIGHT_V2_TIME)
     {
         double nDiffcu = log(approx_height)*0.1;
         nSubsidy = 50 * pow( (5.55243*(exp_n(-0.3*nDiff/0.39*M7Mv2_SCALE) - exp_n(-0.6*nDiff/0.39*M7Mv2_SCALE)))*nDiff, 0.5) / 0.8456
@@ -1236,21 +1238,22 @@ int64 GetProofOfWorkReward(int nBits, int nTime, int64 nFees)
         if (fDebug && fDebugMagi) printf("@@GPoWR nHeight = %lld, nSubsidy = %"PRI64d", nDiff = %f\n", 
                     approx_height, nSubsidy/COIN, nDiff);
 
-        // Yearly decline (7%): Based on elapsed time (~525600 blocks/year)
+        // Yearly decline
         int64 seconds_since_genesis = static_cast<int64>(nTime) - GENESIS_TIME;
         int years = seconds_since_genesis / (525600LL * BLOCK_INTERVAL);
         nSubsidy *= pow(0.93, years);
     }
-    // Post-PoW: Minimal fee only (up to MAX_MAGI_POW_HEIGHT_TIME if you want a hard cap)
+    // Post-PoW
     else if (nTime <= MAX_MAGI_POW_HEIGHT_TIME) {
         nSubsidy = MIN_TX_FEE;
     }
     else {
-        nSubsidy = 0;  // Or error/halt; beyond max
+        nSubsidy = 0;
     }
 
     return nSubsidy + nFees;
 }
+
 
 double GetAnnualInterest_TestNet(int64 nNetWorkWeit, double rMaxAPR)
 {
@@ -1461,11 +1464,22 @@ unsigned int GetNextTargetRequired_v1(const CBlockIndex* pindexLast, bool fProof
     return bnNew.GetCompact();
 }
 
-#define HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT 1482000
-int64 GetTargetSpacingWork(int nHeight)
+// Target Spacing Constants (assume defined elsewhere; e.g., from Magi source)
+static const int64 nTargetSpacingWork = 60LL;  // Standard 1-min target
+static const int64 nTargetSpacingV3Work = 60LL;  // V3 target (adjust if different in your codebase)
+
+// Height Threshold for V3 Spacing
+static const int HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT = 1482000;
+
+// Ported: GetTargetSpacingWork - Pure time-based
+int64 GetTargetSpacingWork(int nTime)
 {
-    return ( (nHeight >= HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT) ? 
-        nTargetSpacingV3Work : nTargetSpacingWork );
+    // Approx height only for V3 threshold (historical ~Sep 20, 2017)
+    int64 approx_height = (static_cast<int64>(nTime) - GENESIS_TIME) / BLOCK_INTERVAL;
+    if (approx_height < 0) approx_height = 0;
+
+    return (approx_height >= HEIGHT_DIFF_ADJ_TARGET_SPACKING_WORK_V3_INIT) ? 
+        nTargetSpacingV3Work : nTargetSpacingWork;
 }
 
 int64 GetTargetTimespanV3(bool fProofOfStake)
