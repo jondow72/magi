@@ -1272,32 +1272,35 @@ double GetAnnualInterest(int64 nNetWorkWeit, double rMaxAPR)
     return rAPR;
 }
 
-double GetAnnualInterestV2(int64 nNetWorkWeit, double rMaxAPR, CBlockIndex* pindex0)
+// Stub/Port: GetAnnualInterestV2 (V2 dynamic)
+double GetAnnualInterestV2(int64 nNetWorkWeit, int64 maxStake, int64 approx_height)
 {
-    double rAPR, rWeit=500000.;
-//    if (fTestNet) return GetAnnualInterest_TestNet(nNetWorkWeit, rMaxAPR);
-    rAPR = ( ( 2./( 1.+exp_n(1./(nNetWorkWeit/rWeit+1.)) ) - 0.53788 ) * rMaxAPR 
-           / ( 2./( 1.+exp_n(1./(rWeit+1.)) ) - 0.53788 ) );
-    if (pindex0 && IsMaintenance(pindex0)) rAPR *= 1.2;
-    if (fDebugMagiPoS) printf("@PoS-APRV2 rAPR = %f\n", rAPR);
-    return rAPR;
+    // Placeholder: Lower base, height decay
+    double utilization = static_cast<double>(nNetWorkWeit) / static_cast<double>(maxStake);
+    double height_factor = 1.0 / (1.0 + approx_height / 10000000.0);  // Slow decay
+    return 0.03 * height_factor * (1.0 - utilization * 0.3);
 }
 
 // miner's coin stake reward based on nBits and coin age spent (coin-days)
-int64 GetProofOfStakeReward(int64 nCoinAge, int64 nFees, CBlockIndex* pindex)
+// Refined: GetProofOfStakeReward
+int64 GetProofOfStakeReward(int64 nCoinAge, int64 nFees, int nTime)
 {
-    int64 nNetWorkWeit = GetPoSKernelPS(pindex);
-    double rAPR = (IsPoSIIProtocolV2(pindex->nHeight+1)) ? 
-		  GetAnnualInterestV2(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE, pindex) : 
-		  GetAnnualInterest(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE);
+    // Approximate height
+    int64 approx_height = (static_cast<int64>(nTime) - GENESIS_TIME) / BLOCK_INTERVAL;
+    if (approx_height < 0) approx_height = 0;
+
+    int64 nNetWorkWeit = static_cast<int64>(GetPoSKernelPS(nTime, DEFAULT_PoS_LOOKUP));
+    double rAPR = (IsPoSIIProtocolV2(approx_height + 1)) ? 
+                  GetAnnualInterestV2(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE, approx_height) : 
+                  GetAnnualInterest(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE);
 
     int64 nSubsidy = nCoinAge * rAPR * COIN * 33 / (365 * 33 + 8);
 
-	if (fDebug && GetBoolArg("-printcreation"))
-        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRI64d" nBits=%d\n", FormatMoney(nSubsidy).c_str(), nCoinAge, pindex->nHeight);
+    if (fDebug && GetBoolArg("-printcreation"))
+        printf("GetProofOfStakeReward(): create=%s nCoinAge=%"PRI64d" nHeight~%lld\n", FormatMoney(nSubsidy).c_str(), nCoinAge, approx_height);
 
-	if (fDebug && fDebugMagi) printf("@@GPoSR nHeight = %d, nSubsidy = %"PRI64d", nCoinAge = %"PRI64d", rAPR = %f\n", 
-				pindex->nHeight, nSubsidy/COIN, nCoinAge, rAPR);
+    if (fDebug && fDebugMagi) printf("@@GPoSR nHeight~%lld, nSubsidy=%"PRI64d", nCoinAge=%"PRI64d", rAPR=%f\n", 
+                approx_height, nSubsidy/COIN, nCoinAge, rAPR);
 
     return nSubsidy + nFees;
 }
