@@ -4,7 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "main.h"
-#include "bitcoinrpc.h"
+#include "magirpc.h"
+#include "checkpoints.h"
+#include "kernel.h"
 
 using namespace json_spirit;
 using namespace std;
@@ -20,7 +22,7 @@ double GetDifficulty(const CBlockIndex* blockindex)
         if (pindexBest == NULL)
             return 1.0;
         else
-            blockindex = GetLastBlockIndex(pindexBest, false);
+            blockindex = GetLastBlockIndex(pindexBest, false);	// PoW
     }
 
     int nShift = (blockindex->nBits >> 24) & 0xff;
@@ -42,6 +44,124 @@ double GetDifficulty(const CBlockIndex* blockindex)
     return dDiff;
 }
 
+
+double GetPoSKernelPS(const CBlockIndex* blockindex, int lookup)
+{
+    int nPoSInterval = lookup;
+    double dStakeKernelsTriedAvg = 0;
+    int nStakesHandled = 0, nStakesTime = 0;
+
+    const CBlockIndex* pindex = ((blockindex == NULL) ? GetLastBlockIndex(pindexBest, true) : blockindex);
+    const CBlockIndex* pindexPrevStake = NULL;
+
+    while (pindex && nStakesHandled < nPoSInterval)
+    {
+        if (pindex->IsProofOfStake())
+        {
+            dStakeKernelsTriedAvg += GetDifficulty(pindex) * 4294967296.0;
+            nStakesTime += pindexPrevStake ? (pindexPrevStake->nTime - pindex->nTime) : 0;
+            pindexPrevStake = pindex;
+            nStakesHandled++;
+        }
+
+        pindex = pindex->pprev;
+    }
+    if (fDebugMagi)
+	printf("@GetPoSKernelPS -> stake blocks for average = %d\n", nStakesHandled);
+
+    double result = 0;
+
+    if (nStakesTime)
+        result = dStakeKernelsTriedAvg / nStakesTime;
+
+    if (IsProtocolV3(nBestHeight))
+        result *= STAKE_TIMESTAMP_MASK + 1;
+
+    return result;
+}
+
+// hashrate = diff * 2^32/blocktime = diff * 4 294 967 296 / blocktime
+double GetPoSKernelPSV2(const CBlockIndex* blockindex, int lookup)
+{
+    int nPoSInterval = lookup;
+    double diffTot = 0.;
+
+    const CBlockIndex* pindex0 = ((blockindex == NULL) ? GetLastBlockIndex(pindexBest, true) : blockindex);
+    const CBlockIndex* pindexPrev = GetLastPoSBlockIndex(pindex0);
+    if (pindexPrev == NULL || !pindexPrev->nHeight) return 0;
+    const CBlockIndex* pindexPrevPrev = GetLastPoSBlockIndex(pindexPrev->pprev);
+    if (pindexPrevPrev == NULL || !pindexPrevPrev->nHeight) return 0;
+
+    int nActualBlockTime = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime(), nActualBlockTimeTot = nActualBlockTime;
+    int nStakesHandled = 1;
+//    if (nActualBlockTime <= 0) {
+//	nActualBlockTimeTot = 0;
+//	nStakesHandled = 0;
+//    }
+//    else {
+      diffTot = GetDifficulty(pindexPrev);
+//    }
+    for(int i = 1; i < nPoSInterval; i++)
+    {
+	pindexPrev = pindexPrevPrev;
+	pindexPrevPrev = GetLastPoSBlockIndex(pindexPrev->pprev);
+	if (pindexPrevPrev == NULL || !pindexPrevPrev->nHeight) break;
+	nActualBlockTime = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
+//	if (nActualBlockTime > 0)
+//	{
+	    diffTot += GetDifficulty(pindexPrev);
+	    nActualBlockTimeTot += nActualBlockTime;
+	    nStakesHandled++;
+//	}
+    }
+    if (nActualBlockTimeTot == 0 || nStakesHandled == 0) return 0;
+    if (fDebugMagi)
+	printf("@GetPoSKernelPSV2 -> aver diff = %f, block time = %f\n", diffTot / (double)nStakesHandled, (double)nActualBlockTimeTot / (double)nStakesHandled);
+
+    return diffTot*4294967296.0/double(nActualBlockTimeTot);
+}
+
+double GetPoSKernelPSV3(const CBlockIndex* blockindex)
+{
+    int nPoSInterval = 72;
+    double dStakeKernelsTriedAvg = 0., diff = 0.;
+
+    const CBlockIndex* pindex0 = ((blockindex == NULL) ? GetLastBlockIndex(pindexBest, true) : blockindex);
+    const CBlockIndex* pindexPrev = GetLastPoSBlockIndex(pindex0);
+    if (pindexPrev == NULL || !pindexPrev->nHeight) return 0;
+    const CBlockIndex* pindexPrevPrev = GetLastPoSBlockIndex(pindexPrev->pprev);
+    if (pindexPrevPrev == NULL || !pindexPrevPrev->nHeight) return 0;
+
+    int nActualBlockTime = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime(), nActualBlockTimeTot = nActualBlockTime;
+    int nStakesHandled = 1;
+    if (nActualBlockTime <= 0) {
+	nActualBlockTimeTot = 0;
+	nStakesHandled = 0;
+    }
+    else {
+      diff = GetDifficulty(pindexPrev);
+      dStakeKernelsTriedAvg = GetDifficulty(pindexPrev) * 4294967296.0 / double(nActualBlockTime);
+    }
+    for(int i = 1; i < nPoSInterval; i++)
+    {
+	pindexPrev = pindexPrevPrev;
+	pindexPrevPrev = GetLastPoSBlockIndex(pindexPrev->pprev);
+	if (pindexPrevPrev == NULL || !pindexPrevPrev->nHeight) break;
+	nActualBlockTime = pindexPrev->GetBlockTime() - pindexPrevPrev->GetBlockTime();
+	if (nActualBlockTime > 0)
+	{
+	    diff += GetDifficulty(pindexPrev);
+	    dStakeKernelsTriedAvg += GetDifficulty(pindexPrev) * 4294967296.0 / double(nActualBlockTime);
+	    nActualBlockTimeTot += nActualBlockTime;
+	    nStakesHandled++;
+	}
+    }
+    if (nActualBlockTimeTot == 0 || nStakesHandled == 0) return 0;
+    if (fDebugMagi)
+	printf("@GetPoSKernelPSV2 -> aver diff = %f, block time = %f\n", diff / (double)nStakesHandled, (double)nActualBlockTimeTot / (double)nStakesHandled);
+
+    return dStakeKernelsTriedAvg / double(nStakesHandled);
+}
 
 Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool fPrintTransactionDetail)
 {
@@ -118,6 +238,16 @@ Value getdifficulty(const Array& params, bool fHelp)
     return obj;
 }
 
+
+Value getdifficultym(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getdifficultym\n"
+            "Returns the proof-of-work difficulty as a multiple of the minimum difficulty.");
+
+    return GetDifficulty();
+}
 
 Value settxfee(const Array& params, bool fHelp)
 {
@@ -210,23 +340,191 @@ Value getblockbynumber(const Array& params, bool fHelp)
     return blockToJSON(block, pblockindex, params.size() > 1 ? params[1].get_bool() : false);
 }
 
-// ppcoin: get information of sync-checkpoint
-Value getcheckpoint(const Array& params, bool fHelp)
+unsigned int MagiQuantumWave(const CBlockIndex* pindexLast, bool fProofOfStake);
+unsigned int MagiQuantumWave_v2(const CBlockIndex* pindexLast, bool fProofOfStake);
+unsigned int GetNextTargetRequired(const CBlockIndex* pindexLast, bool fProofOfStake);
+Value getchainfo(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "getchainfobyheight <height>\n");
+
+    int nHeight = params[0].get_int();
+    if (nHeight < 1 || nHeight > nBestHeight)
+        throw runtime_error("Block number out of range.");
+
+    Object obj;
+
+    const CBlockIndex* pblockindex = FindBlockByHeight(nHeight);
+    obj.push_back(Pair("flags", strprintf("%s", pblockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work")));
+    obj.push_back(Pair("height", pblockindex->nHeight));
+    obj.push_back(Pair("hash", pblockindex->phashBlock->GetHex()));
+
+    const CBlockIndex* pblockindexprev = GetLastBlockIndex(pblockindex->pprev, pblockindex->IsProofOfStake());
+    obj.push_back(Pair("hashPrev", pblockindexprev->phashBlock->GetHex()));
+    obj.push_back(Pair("difficulty", GetDifficulty(pblockindex)));
+
+    int bnBitsMQW = MagiQuantumWave(pblockindexprev, pblockindexprev->IsProofOfStake());
+    int bnBitsMQW_v2 = MagiQuantumWave_v2(pblockindexprev, pblockindexprev->IsProofOfStake());
+    int bnBitsTarget = GetNextTargetRequired(pblockindexprev, pblockindexprev->IsProofOfStake());
+
+    obj.push_back(Pair("PoS Blocktime", (int) GetStakeTargetSpacing(nHeight)));
+    obj.push_back(Pair("nTime", (int) pblockindex->GetBlockTime()));
+    obj.push_back(Pair("nBits", HexBits(pblockindex->nBits)));
+    obj.push_back(Pair("nBitsMQW", HexBits(bnBitsMQW)));
+    obj.push_back(Pair("bnBitsMQW_v2", HexBits(bnBitsMQW_v2)));
+    obj.push_back(Pair("nBitsTarget", HexBits(bnBitsTarget)));
+
+    obj.push_back(Pair("diff", GetDifficultyFromBits(pblockindex->nBits)));
+    obj.push_back(Pair("diffMQW", GetDifficultyFromBits(bnBitsMQW)));
+    obj.push_back(Pair("diffTarget", GetDifficultyFromBits(bnBitsTarget)));
+
+    CBlockIndex* pcheckpoint = Checkpoints::GetLastSyncCheckpoint();
+    int64 deltaTime = pblockindex->GetBlockTime() - pcheckpoint->nTime;
+
+    CBigNum bnNewBlock;
+    bnNewBlock.SetCompact(pblockindex->nBits);
+    CBigNum bnRequired;
+    unsigned int nRequired;
+
+    const CBlockIndex* pcheckpointLast;
+    if (pblockindex->IsProofOfStake()) {
+        bnRequired.SetCompact(ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblockindex->nTime));
+        nRequired = ComputeMinStake(GetLastBlockIndex(pcheckpoint, true)->nBits, deltaTime, pblockindex->nTime);
+        pcheckpointLast = GetLastBlockIndex(pcheckpoint, true);
+    } else {
+        bnRequired.SetCompact(ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime));
+        nRequired = ComputeMinWork(GetLastBlockIndex(pcheckpoint, false)->nBits, deltaTime);
+        pcheckpointLast = GetLastBlockIndex(pcheckpoint, false);
+    }
+
+    obj.push_back(Pair("checkpoint-height", pcheckpoint->nHeight));
+    obj.push_back(Pair("deltaTime", (int) deltaTime));
+    obj.push_back(Pair("pcheckpointLast-height", pcheckpointLast->nHeight));
+
+    obj.push_back(Pair("bnNewBlock", HexBits(pblockindex->nBits)));
+    obj.push_back(Pair("bnRequired", HexBits(nRequired)));
+
+    return obj;
+}
+
+int64 GetProofOfWorkRewardV2(const CBlockIndex* pindexPrev, int64 nFees, bool fLastBlock);
+//double GetDifficultyFromBitsV2(const CBlockIndex* pindex0);
+Value getnewblockvaluebynumber(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "getnewblockvaluebynumber <number>\n"
+            "Returns a block reward with given block-number.");
+
+    int nHeight = params[0].get_int();
+    if (nHeight < 1 || nHeight > nBestHeight)
+        throw runtime_error("Block number out of range.");
+
+    CBlock block;
+    CBlockIndex* pblockindex = mapBlockIndex[hashBestChain];
+    while (pblockindex->nHeight > nHeight)
+        pblockindex = pblockindex->pprev;
+    Object obj;
+    obj.push_back(Pair("flags", strprintf("%s", pblockindex->IsProofOfStake()? "proof-of-stake" : "proof-of-work")));
+    if (pblockindex->IsProofOfStake()) {
+	obj.push_back(Pair("difficulty", GetDifficulty(pblockindex)));
+	obj.push_back(Pair("difficulty for Blockvalue (PoW)", GetDifficultyFromBitsV2(pblockindex)));
+	obj.push_back(Pair("blockvalue (PoW)", ((double)GetProofOfWorkRewardV2(pblockindex, 0, false))/((double)COIN)));
+    }
+    else {
+	obj.push_back(Pair("difficulty", GetDifficulty(pblockindex)));
+	obj.push_back(Pair("difficulty for Blockvalue", GetDifficultyFromBitsV2(pblockindex)));
+	obj.push_back(Pair("blockvalue", ((double)GetProofOfWorkRewardV2(pblockindex, 0, false))/((double)COIN)));
+    }
+    return obj;
+}
+
+Value getautocheckpoint(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
-            "getcheckpoint\n"
+            "getautocheckpoint\n"
+            "Show info of auto synchronized checkpoint.\n");
+
+    Object result;
+    const CBlockIndex* pindexCheckpoint = Checkpoints::AutoSelectSyncCheckpoint();
+
+    result.push_back(Pair("synccheckpoint", pindexCheckpoint->GetBlockHash().ToString().c_str()));
+    result.push_back(Pair("height", pindexCheckpoint->nHeight));
+    result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
+
+    return result;
+}
+
+Value getsynccheckpoint(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "getsynccheckpoint\n"
             "Show info of synchronized checkpoint.\n");
+
+    Object result;
+    result.push_back(Pair("checkpoint", Checkpoints::hashSyncCheckpoint.ToString().c_str()));
+    if (mapBlockIndex.count(Checkpoints::hashSyncCheckpoint))
+    {
+        CBlockIndex* pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];
+        result.push_back(Pair("height", pindexCheckpoint->nHeight));
+        result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
+    }
+
+    if (mapArgs.count("-checkpointkey"))
+        result.push_back(Pair("checkpointmaster", true));
+
+    return result;
+}
+
+Value sendcheckpoint(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "sendcheckpoint <blockhash>\n"
+            "Send a synchronized checkpoint.\n");
+
+    if (!mapArgs.count("-checkpointkey") || CSyncCheckpoint::strMasterPrivKey.empty())
+        throw runtime_error("Not a checkpointmaster node, first set checkpointkey in configuration and restart client. ");
+
+    std::string strHash = params[0].get_str();
+    uint256 hash(strHash);
+
+    if (!Checkpoints::SendSyncCheckpoint(hash))
+        throw runtime_error("Failed to send checkpoint, check log. ");
 
     Object result;
     CBlockIndex* pindexCheckpoint;
 
     result.push_back(Pair("synccheckpoint", Checkpoints::hashSyncCheckpoint.ToString().c_str()));
-    pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];        
-    result.push_back(Pair("height", pindexCheckpoint->nHeight));
-    result.push_back(Pair("timestamp", DateTimeStrFormat(pindexCheckpoint->GetBlockTime()).c_str()));
+    if (mapBlockIndex.count(Checkpoints::hashSyncCheckpoint))
+    {
+        pindexCheckpoint = mapBlockIndex[Checkpoints::hashSyncCheckpoint];
+        result.push_back(Pair("height", pindexCheckpoint->nHeight));
+        result.push_back(Pair("timestamp", (boost::int64_t) pindexCheckpoint->GetBlockTime()));
+    }
+    result.push_back(Pair("subscribemode", Checkpoints::IsSyncCheckpointEnforced()? "enforce" : "advisory"));
     if (mapArgs.count("-checkpointkey"))
         result.push_back(Pair("checkpointmaster", true));
 
     return result;
+}
+
+Value enforcecheckpoint(const Array& params, bool fHelp)
+{
+    if (fHelp || params.size() != 1)
+        throw runtime_error(
+            "enforcecheckpoint <enforce>\n"
+            "<enforce> is true or false to enable or disable enforcement of broadcasted checkpoints by developer.");
+
+    bool fEnforceCheckpoint = params[0].get_bool();
+    if (mapArgs.count("-checkpointkey") && !fEnforceCheckpoint)
+        throw runtime_error(
+            "checkpoint master node must enforce synchronized checkpoints.");
+    if (fEnforceCheckpoint)
+        Checkpoints::strCheckpointWarning = "";
+    mapArgs["-checkpointenforce"] = (fEnforceCheckpoint ? "1" : "0");
+    return Value::null;
 }

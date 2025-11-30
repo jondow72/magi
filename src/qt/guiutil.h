@@ -4,6 +4,10 @@
 #include <QString>
 #include <QObject>
 #include <QMessageBox>
+#include <QLabel>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
+#include <QStackedWidget>
 
 QT_BEGIN_NAMESPACE
 class QFont;
@@ -74,6 +78,9 @@ namespace GUIUtil
     // Open debug.log
     void openDebugLogfile();
 
+    // Open config file
+    void openConfigfile();
+
     /** Qt event filter that intercepts ToolTipChange events, and replaces the tooltip with a rich text
       representation if needed. This assures that Qt can word-wrap long tooltip messages.
       Tooltips longer than the provided size threshold (in characters) are wrapped.
@@ -95,6 +102,11 @@ namespace GUIUtil
     bool GetStartOnSystemStartup();
     bool SetStartOnSystemStartup(bool fAutoStart);
 
+    /** Save window size and position */
+    void saveWindowGeometry(const QString& strSetting, QWidget *parent);
+    /** Restore window size and position */
+    void restoreWindowGeometry(const QString& strSetting, const QSize &defaultSizeIn, QWidget *parent);
+
     /** Help message for Bitcoin-Qt, shown with --help. */
     class HelpMessageBox : public QMessageBox
     {
@@ -114,6 +126,66 @@ namespace GUIUtil
         QString coreOptions;
         QString uiOptions;
     };
+
+    class QCLabel : public QLabel
+    {
+        Q_OBJECT
+
+    public:
+        QCLabel(const QString& text="", QWidget* parent=0);
+        ~QCLabel(){};
+
+    signals:
+        void clicked();
+
+    protected:
+        void mouseReleaseEvent(QMouseEvent* event);
+    };
+
+
+    class QPriceInfo : public QObject
+    {
+        Q_OBJECT
+
+    public:
+        QPriceInfo();
+        ~QPriceInfo(){};
+        void checkPrice();
+        double getPriceInBTC()
+        {
+            return rPriceInBTC;
+        }
+
+        double getPriceInUSD()
+        {
+            return rPriceInUSD;
+        }
+
+    signals:
+        void finished();
+
+    private:
+        QUrl BTCPriceCheckURL;
+        QUrl MagiToUSDPriceCheckURL;
+        double rPriceInBTC;
+        double rPriceInUSD;
+        QNetworkAccessManager mCheckUSDPrice;
+        QNetworkAccessManager mCheckBTCPrice;
+    private slots:
+        void updatePriceInUSD(QNetworkReply* resp);
+        void updatePriceInBTC(QNetworkReply* resp);
+    };
+
+    class QRStackedWidget : public QStackedWidget
+    {
+        Q_OBJECT
+    public:
+        QRStackedWidget(QWidget *parent = 0) : QStackedWidget(parent) {};
+        ~QRStackedWidget(){};
+        void addWidget(QWidget* pWidget);
+        void onCurrentChanged(int index);
+    };
+
 
 } // namespace GUIUtil
 

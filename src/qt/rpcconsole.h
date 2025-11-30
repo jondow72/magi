@@ -3,6 +3,18 @@
 
 #include <QDialog>
 
+/* Object for executing console RPC commands in a separate thread.
+*/
+class RPCExecutor: public QObject
+{
+    Q_OBJECT
+public slots:
+    void start();
+    void request(const QString &command);
+signals:
+    void reply(int category, const QString &command);
+};
+
 namespace Ui {
     class RPCConsole;
 }
@@ -28,27 +40,20 @@ public:
     };
 
 protected:
-    virtual bool eventFilter(QObject* obj, QEvent *event);
+//    virtual bool eventFilter(QObject* obj, QEvent *event);
 
 private slots:
-    void on_lineEdit_returnPressed();
     void on_tabWidget_currentChanged(int index);
     /** open the debug.log from the current datadir */
     void on_openDebugLogfileButton_clicked();
-    /** display messagebox with program parameters (same as bitcoin-qt --help) */
+    /** display messagebox with program parameters (same as magi-qt --help) */
     void on_showCLOptionsButton_clicked();
 
 public slots:
-    void clear();
-    void message(int category, const QString &message, bool html = false);
     /** Set number of connections shown in the UI */
     void setNumConnections(int count);
     /** Set number of blocks shown in the UI */
     void setNumBlocks(int count, int countOfPeers);
-    /** Go forward or back in history */
-    void browseHistory(int offset);
-    /** Scroll console view to end */
-    void scrollToEnd();
 signals:
     // For RPC command executor
     void stopExecutor();

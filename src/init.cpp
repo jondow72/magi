@@ -2,14 +2,13 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#include "db.h"
-#include "walletdb.h"
-#include "bitcoinrpc.h"
-#include "net.h"
 #include "init.h"
+#include "walletdb.h"
+#include "magirpc.h"
+#include "txdb.h"
+#include "net.h"
 #include "util.h"
 #include "ui_interface.h"
-#include "checkpoints.h"
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/filesystem/convenience.hpp>
@@ -27,6 +26,10 @@ using namespace boost;
 CWallet* pwalletMain;
 CClientUIInterface uiInterface;
 
+bool fUseFastIndex;
+extern int64 nStakeSplitThreshold;
+extern int64 nStakeCombineThreshold;
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // Shutdown
@@ -35,7 +38,7 @@ CClientUIInterface uiInterface;
 void ExitTimeout(void* parg)
 {
 #ifdef WIN32
-    Sleep(5000);
+    MilliSleep(5000);
     ExitProcess(0);
 #endif
 }
@@ -57,7 +60,7 @@ void Shutdown(void* parg)
     static bool fTaken;
 
     // Make this thread recognisable as the shutdown thread
-    RenameThread("bitcoin-shutoff");
+    RenameThread("magi-shutoff");
 
     bool fFirstThread = false;
     {
@@ -80,8 +83,8 @@ void Shutdown(void* parg)
         UnregisterWallet(pwalletMain);
         delete pwalletMain;
         NewThread(ExitTimeout, NULL);
-        Sleep(50);
-        printf("NovaCoin exited\n\n");
+        MilliSleep(50);
+        printf("Magi exited\n\n");
         fExit = true;
 #ifndef QT_GUI
         // ensure non-UI client gets exited here, but let Bitcoin-Qt reach 'return 0;' in bitcoin.cpp
@@ -91,8 +94,8 @@ void Shutdown(void* parg)
     else
     {
         while (!fExit)
-            Sleep(500);
-        Sleep(100);
+            MilliSleep(500);
+        MilliSleep(100);
         ExitThread(0);
     }
 }
@@ -136,12 +139,12 @@ bool AppInit(int argc, char* argv[])
         if (mapArgs.count("-?") || mapArgs.count("--help"))
         {
             // First part of help message is specific to bitcoind / RPC client
-            std::string strUsage = _("NovaCoin version") + " " + FormatFullVersion() + "\n\n" +
+            std::string strUsage = _("Magi version") + " " + FormatFullVersion() + "\n\n" +
                 _("Usage:") + "\n" +
-                  "  novacoind [options]                     " + "\n" +
-                  "  novacoind [options] <command> [params]  " + _("Send command to -server or novacoind") + "\n" +
-                  "  novacoind [options] help                " + _("List commands") + "\n" +
-                  "  novacoind [options] help <command>      " + _("Get help for a command") + "\n";
+                  "  magid [options]                     " + "\n" +
+                  "  magid [options] <command> [params]  " + _("Send command to -server or magid") + "\n" +
+                  "  magid [options] help                " + _("List commands") + "\n" +
+                  "  magid [options] help <command>      " + _("Get help for a command") + "\n";
 
             strUsage += "\n" + HelpMessage();
 
@@ -151,7 +154,7 @@ bool AppInit(int argc, char* argv[])
 
         // Command-line RPC
         for (int i = 1; i < argc; i++)
-            if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "novacoin:"))
+            if (!IsSwitchChar(argv[i][0]) && !boost::algorithm::istarts_with(argv[i], "Magi:"))
                 fCommandLine = true;
 
         if (fCommandLine)
@@ -191,13 +194,13 @@ int main(int argc, char* argv[])
 
 bool static InitError(const std::string &str)
 {
-    uiInterface.ThreadSafeMessageBox(str, _("NovaCoin"), CClientUIInterface::OK | CClientUIInterface::MODAL);
+    uiInterface.ThreadSafeMessageBox(str, _("Magi"), CClientUIInterface::OK | CClientUIInterface::MODAL);
     return false;
 }
 
 bool static InitWarning(const std::string &str)
 {
-    uiInterface.ThreadSafeMessageBox(str, _("NovaCoin"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
+    uiInterface.ThreadSafeMessageBox(str, _("Magi"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
     return true;
 }
 
@@ -219,10 +222,12 @@ std::string HelpMessage()
 {
     string strUsage = _("Options:") + "\n" +
         "  -?                     " + _("This help message") + "\n" +
-        "  -conf=<file>           " + _("Specify configuration file (default: novacoin.conf)") + "\n" +
-        "  -pid=<file>            " + _("Specify pid file (default: novacoind.pid)") + "\n" +
+        "  -conf=<file>           " + _("Specify configuration file (default: magi.conf)") + "\n" +
+        "  -pid=<file>            " + _("Specify pid file (default: magid.pid)") + "\n" +
         "  -gen                   " + _("Generate coins") + "\n" +
         "  -gen=0                 " + _("Don't generate coins") + "\n" +
+        "  -posii                 " + _("Stake coins - PoS-II") + "\n" +
+        "  -posii=0               " + _("Turn off staking - PoS-II") + "\n" +
         "  -datadir=<dir>         " + _("Specify data directory") + "\n" +
         "  -dbcache=<n>           " + _("Set database cache size in megabytes (default: 25)") + "\n" +
         "  -dblogsize=<n>         " + _("Set database disk log size in megabytes (default: 100)") + "\n" +
@@ -231,7 +236,7 @@ std::string HelpMessage()
         "  -socks=<n>             " + _("Select the version of socks proxy to use (4-5, default: 5)") + "\n" +
         "  -tor=<ip:port>         " + _("Use proxy to reach tor hidden services (default: same as -proxy)") + "\n"
         "  -dns                   " + _("Allow DNS lookups for -addnode, -seednode and -connect") + "\n" +
-        "  -port=<port>           " + _("Listen for connections on <port> (default: 7777 or testnet: 17777)") + "\n" +
+        "  -port=<port>           " + _("Listen for connections on <port> (default: 8233 or testnet: 18233)") + "\n" +
         "  -maxconnections=<n>    " + _("Maintain at most <n> connections to peers (default: 125)") + "\n" +
         "  -addnode=<ip>          " + _("Add a node to connect to and attempt to keep the connection open") + "\n" +
         "  -connect=<ip>          " + _("Connect only to the specified node(s)") + "\n" +
@@ -239,15 +244,17 @@ std::string HelpMessage()
         "  -externalip=<ip>       " + _("Specify your own public address") + "\n" +
         "  -onlynet=<net>         " + _("Only connect to nodes in network <net> (IPv4, IPv6 or Tor)") + "\n" +
         "  -discover              " + _("Discover own IP address (default: 1 when listening and no -externalip)") + "\n" +
-        "  -irc                   " + _("Find peers using internet relay chat (default: 1)") + "\n" +
+        "  -checkpoints           " + _("Only accept block chain matching built-in checkpoints (default: 1)") + "\n" +
         "  -listen                " + _("Accept connections from outside (default: 1 if no -proxy or -connect)") + "\n" +
         "  -bind=<addr>           " + _("Bind to given address. Use [host]:port notation for IPv6") + "\n" +
-        "  -dnsseed               " + _("Find peers using DNS lookup (default: 0)") + "\n" +
+        "  -dnsseed               " + _("Find peers using DNS lookup (default: 1)") + "\n" +
         "  -nosynccheckpoints     " + _("Disable sync checkpoints (default: 0)") + "\n" +
         "  -banscore=<n>          " + _("Threshold for disconnecting misbehaving peers (default: 100)") + "\n" +
         "  -bantime=<n>           " + _("Number of seconds to keep misbehaving peers from reconnecting (default: 86400)") + "\n" +
         "  -maxreceivebuffer=<n>  " + _("Maximum per-connection receive buffer, <n>*1000 bytes (default: 5000)") + "\n" +
         "  -maxsendbuffer=<n>     " + _("Maximum per-connection send buffer, <n>*1000 bytes (default: 1000)") + "\n" +
+        "  -stakecombinethreshold=<n>     " + _("Threshold for PoS stake combining various small inputs (default: < 250 XMG)") + "\n" +
+        "  -stakesplitthreshold=<n>     " + _("Threshold for PoS stake splitting into two (default: > 500 XMG)") + "\n" +
 #ifdef USE_UPNP
 #if USE_UPNP
         "  -upnp                  " + _("Use UPnP to map the listening port (default: 1 when listening)") + "\n" +
@@ -257,6 +264,7 @@ std::string HelpMessage()
 #endif
         "  -detachdb              " + _("Detach block and address databases. Increases shutdown time (default: 0)") + "\n" +
         "  -paytxfee=<amt>        " + _("Fee per KB to add to transactions you send") + "\n" +
+        "  -mininput=<amt>        " + _("When creating transactions, ignore inputs with value less than this (default: 0.01)") + "\n" +
 #ifdef QT_GUI
         "  -server                " + _("Accept command line and JSON-RPC commands") + "\n" +
 #endif
@@ -274,10 +282,11 @@ std::string HelpMessage()
 #endif
         "  -rpcuser=<user>        " + _("Username for JSON-RPC connections") + "\n" +
         "  -rpcpassword=<pw>      " + _("Password for JSON-RPC connections") + "\n" +
-        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 8344 or testnet: 18344)") + "\n" +
+        "  -rpcport=<port>        " + _("Listen for JSON-RPC connections on <port> (default: 8232 or testnet: 18232)") + "\n" +
         "  -rpcallowip=<ip>       " + _("Allow JSON-RPC connections from specified IP address") + "\n" +
         "  -rpcconnect=<ip>       " + _("Send commands to node running on <ip> (default: 127.0.0.1)") + "\n" +
         "  -blocknotify=<cmd>     " + _("Execute command when the best block changes (%s in cmd is replaced by block hash)") + "\n" +
+		"  -walletnotify=<cmd>    " + _("Execute command when a wallet transaction changes (%s in cmd is replaced by TxID)") + "\n" +
         "  -upgradewallet         " + _("Upgrade wallet to latest format") + "\n" +
         "  -keypool=<n>           " + _("Set key pool size to <n> (default: 100)") + "\n" +
         "  -rescan                " + _("Rescan the block chain for missing wallet transactions") + "\n" +
@@ -350,9 +359,7 @@ bool AppInit2()
     // ********************************************************* Step 2: parameter interactions
 
     fTestNet = GetBoolArg("-testnet");
-    if (fTestNet) {
-        SoftSetBoolArg("-irc", true);
-    }
+    fUseFastIndex = GetBoolArg("-fastindex", true);
 
     if (mapArgs.count("-bind")) {
         // when specifying an explicit binding address, you want to listen on it
@@ -387,9 +394,17 @@ bool AppInit2()
         SoftSetBoolArg("-rescan", true);
     }
 
+    nStakeSplitThreshold = GetArg("-stakesplitthreshold", nStakeSplitThreshold);
+    nStakeCombineThreshold = GetArg("-stakecombinethreshold", nStakeCombineThreshold);
+
     // ********************************************************* Step 3: parameter-to-internal-flags
 
     fDebug = GetBoolArg("-debug");
+    fDebugMagi = GetBoolArg("-debugmagi");
+    fDebugMagiPoS = GetBoolArg("-debugmagipos");
+    if (fDebug) printf("fDebug enabled...\n");
+    if (fDebugMagi) printf("fDebugMagi enabled...\n");
+    if (fDebugMagiPoS) printf("fDebugMagiPoS enabled...\n");
 
     // -debug implies fDebug*
     if (fDebug)
@@ -440,6 +455,12 @@ bool AppInit2()
             InitWarning(_("Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction."));
     }
 
+    if (mapArgs.count("-mininput"))
+    {
+        if (!ParseMoney(mapArgs["-mininput"], nMinimumInputValue))
+            return InitError(strprintf(_("Invalid amount for -mininput=<amount>: '%s'"), mapArgs["-mininput"].c_str()));
+    }
+
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
 
     std::string strDataDir = GetDataDir().string();
@@ -450,7 +471,7 @@ bool AppInit2()
     if (file) fclose(file);
     static boost::interprocess::file_lock lock(pathLockFile.string().c_str());
     if (!lock.try_lock())
-        return InitError(strprintf(_("Cannot obtain a lock on data directory %s.  NovaCoin is probably already running."), strDataDir.c_str()));
+        return InitError(strprintf(_("Cannot obtain a lock on data directory %s.  Magi is probably already running."), strDataDir.c_str()));
 
 #if !defined(WIN32) && !defined(QT_GUI)
     if (fDaemon)
@@ -477,7 +498,7 @@ bool AppInit2()
     if (GetBoolArg("-shrinkdebugfile", !fDebug))
         ShrinkDebugFile();
     printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n");
-    printf("NovaCoin version %s (%s)\n", FormatFullVersion().c_str(), CLIENT_DATE.c_str());
+    printf("Magi version %s (%s)\n", FormatFullVersion().c_str(), CLIENT_DATE.c_str());
     printf("Using OpenSSL version %s\n", SSLeay_version(SSLEAY_VERSION));
     if (!fLogTimestamps)
         printf("Startup time: %s\n", DateTimeStrFormat("%x %H:%M:%S", GetTime()).c_str());
@@ -486,7 +507,7 @@ bool AppInit2()
     std::ostringstream strErrors;
 
     if (fDaemon)
-        fprintf(stdout, "NovaCoin server starting\n");
+        fprintf(stdout, "Magi server starting\n");
 
     int64 nStart;
 
@@ -518,7 +539,7 @@ bool AppInit2()
                                      " Original wallet.dat saved as wallet.{timestamp}.bak in %s; if"
                                      " your balance or transactions are incorrect you should"
                                      " restore from a backup."), strDataDir.c_str());
-            uiInterface.ThreadSafeMessageBox(msg, _("NovaCoin"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
+            uiInterface.ThreadSafeMessageBox(msg, _("Magi"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
         }
         if (r == CDBEnv::RECOVER_FAIL)
             return InitError(_("wallet.dat corrupt, salvage failed"));
@@ -646,7 +667,14 @@ bool AppInit2()
     BOOST_FOREACH(string strDest, mapMultiArgs["-seednode"])
         AddOneShot(strDest);
 
-    // ********************************************************* Step 7: load blockchain
+    // TODO: replace this by DNSseed
+    // AddOneShot(string(""));
+
+    // ********************************************************* Step 7: load block chain
+
+    filesystem::path blocksDir = GetDataDir() / "blocks";
+    if (!filesystem::exists(blocksDir))
+        filesystem::create_directories(blocksDir);
 
     if (!bitdb.Open(GetDataDir()))
     {
@@ -668,7 +696,7 @@ bool AppInit2()
     printf("Loading block index...\n");
     nStart = GetTimeMillis();
     if (!LoadBlockIndex())
-        return InitError(_("Error loading blkindex.dat"));
+        return InitError(_("Error loading block database"));
 
     // as LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill bitcoin-qt during the last operation. If so, exit.
@@ -709,6 +737,7 @@ bool AppInit2()
         return false;
     }
 
+    
     // ********************************************************* Step 8: load wallet
 
     uiInterface.InitMessage(_("Loading wallet..."));
@@ -725,13 +754,13 @@ bool AppInit2()
         {
             string msg(_("Warning: error reading wallet.dat! All keys read correctly, but transaction data"
                          " or address book entries might be missing or incorrect."));
-            uiInterface.ThreadSafeMessageBox(msg, _("NovaCoin"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
+            uiInterface.ThreadSafeMessageBox(msg, _("Magi"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION | CClientUIInterface::MODAL);
         }
         else if (nLoadWalletRet == DB_TOO_NEW)
-            strErrors << _("Error loading wallet.dat: Wallet requires newer version of NovaCoin") << "\n";
+            strErrors << _("Error loading wallet.dat: Wallet requires newer version of Magi") << "\n";
         else if (nLoadWalletRet == DB_NEED_REWRITE)
         {
-            strErrors << _("Wallet needed to be rewritten: restart NovaCoin to complete") << "\n";
+            strErrors << _("Wallet needed to be rewritten: restart Magi to complete") << "\n";
             printf("%s", strErrors.str().c_str());
             return InitError(strErrors.str());
         }
@@ -868,8 +897,32 @@ bool AppInit2()
     // Loop until process is exit()ed from shutdown() function,
     // called from ThreadRPCServer thread when a "stop" command is received.
     while (1)
-        Sleep(5000);
+        MilliSleep(5000);
 #endif
 
     return true;
+}
+
+
+std::string LicenseInfo(bool f1, bool f2)
+{
+    const std::string URL_SOURCE_CODE = "<https://github.com/magi-project/magi>";
+    const std::string URL_WEBSITE = "<http://m-core.org>";
+    const std::string additionalInfo = "Magi (XMG) is an online payment system, enabling instant payments to anyone in the world without using an intermediary. Magi coins can be minted by computational devices including personal computers and portable devices through mPoW and mPoS. Magi aims at fairness, cost effective and energy efficiency during coin minting.";
+
+    return ( (f1 ? (std::string(BTC_COPYRIGHT_STR) + "\n" + std::string(PPC_COPYRIGHT_STR) + "\n") : "") + 
+        CopyrightHolders(strprintf(_("Copyright (C) %i-%i"), 2014, COPYRIGHT_YEAR) + " ") + "\n" +
+        "\n" +
+        (f2 ? additionalInfo + "\n" : "") + "\n" + 
+        strprintf(_("Please contribute if you find %s useful. Visit %s for further information about the software. "), PACKAGE_NAME,URL_WEBSITE.c_str()) +
+        "\n\n" + 
+        strprintf(_("Source code: %s"), URL_SOURCE_CODE.c_str()) + "\n" + 
+        strprintf(_("Dowloand wallet: %s"), "<http://m-core.org/bin>") + "\n" + 
+        strprintf(_("Block-Chain: %s"), "<http://m-core.org/bin/block-chain>") + "\n" + 
+        strprintf(_("Roadmap: %s"), "<http://m-core.org/resources/roadmap>") + "\n" + 
+        "\n" + 
+        _("This is experimental software.") + 
+        strprintf(_("Distributed under the MIT software license, see the accompanying file %s or %s"), "COPYING", "<https://opensource.org/licenses/MIT>") + "\n" + "\n" +
+        strprintf(_("This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit %s and cryptographic software written by Eric Young and UPnP software written by Thomas Bernard."), "<https://www.openssl.org>") +
+        "\n" );
 }

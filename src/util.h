@@ -2,21 +2,22 @@
 // Copyright (c) 2009-2012 The Bitcoin developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef BITCOIN_UTIL_H
-#define BITCOIN_UTIL_H
+#ifndef MAGI_UTIL_H
+#define MAGI_UTIL_H
 
 #include "uint256.h"
 
 #ifndef WIN32
 #include <sys/types.h>
 #include <sys/time.h>
-#include <sys/resource.h>
-#else
 typedef int pid_t; /* define for Windows compatibility */
+#include <sys/resource.h>
+//#else
 #endif
 #include <map>
 #include <vector>
 #include <string>
+#include <cstdarg>
 
 #include <boost/thread.hpp>
 #include <boost/filesystem.hpp>
@@ -32,10 +33,11 @@ typedef int pid_t; /* define for Windows compatibility */
 typedef long long  int64;
 typedef unsigned long long  uint64;
 
-static const int64 COIN = 1000000;
-static const int64 CENT = 10000;
+static const int64 COIN = 100000000;
+static const int64 CENT = 1000000;
 
-#define loop                for (;;)
+static const double MINFINITESIMAL = 1.e-30;
+
 #define BEGIN(a)            ((char*)&(a))
 #define END(a)              ((char*)&((&(a))[1]))
 #define UBEGIN(a)           ((unsigned char*)&(a))
@@ -124,6 +126,19 @@ inline void Sleep(int64 n)
 }
 #endif
 
+inline void MilliSleep(int64 n)
+{
+// Boost's sleep_for was uninterruptable when backed by nanosleep from 1.50
+// until fixed in 1.52. Use the deprecated sleep method for the broken case.
+// See: https://svn.boost.org/trac/boost/ticket/7238
+
+#if BOOST_VERSION >= 105000 && (!defined(BOOST_HAS_NANOSLEEP) || BOOST_VERSION >= 105200)
+    boost::this_thread::sleep_for(boost::chrono::milliseconds(n));
+#else
+    boost::this_thread::sleep(boost::posix_time::milliseconds(n));
+#endif
+}
+
 /* This GNU C extension enables the compiler to check the format string against the parameters provided.
  * X is the number of the "format string" parameter, and Y is the number of the first variadic parameter.
  * Parameters count from 1.
@@ -134,16 +149,14 @@ inline void Sleep(int64 n)
 #define ATTR_WARN_PRINTF(X,Y)
 #endif
 
-
-
-
-
-
-
+#define BTC_COPYRIGHT_STR "Copyright (C) 2009-2012 The Bitcoin Core Developers"
+#define PPC_COPYRIGHT_STR "Copyright (C) 2012-2014 The PPCoin Developers"
 
 extern std::map<std::string, std::string> mapArgs;
 extern std::map<std::string, std::vector<std::string> > mapMultiArgs;
 extern bool fDebug;
+extern bool fDebugMagi;
+extern bool fDebugMagiPoS;
 extern bool fDebugNet;
 extern bool fPrintToConsole;
 extern bool fPrintToDebugger;
@@ -157,6 +170,8 @@ extern bool fTestNet;
 extern bool fNoListen;
 extern bool fLogTimestamps;
 extern bool fReopenDebugLog;
+extern bool fTestNetWeightV2;
+extern bool fUseFastIndex;
 
 void RandAddSeed();
 void RandAddSeedPerfmon();
@@ -228,18 +243,15 @@ uint256 GetRandHash();
 int64 GetTime();
 void SetMockTime(int64 nMockTimeIn);
 int64 GetAdjustedTime();
-std::string FormatFullVersion();
-std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments);
+int64_t GetTimeOffset();
+long hex2long(const char* hexString);
 void AddTimeData(const CNetAddr& ip, int64 nTime);
 void runCommand(std::string strCommand);
+bool StringToDouble(const std::string &s, double &val);
+unsigned int GetClientVersion(int nClientVersion, std::string str);
 
-
-
-
-
-
-
-
+extern const char *websiteUrl;
+extern const char *feedbackUrl;
 
 inline std::string i64tostr(int64 n)
 {
@@ -421,116 +433,6 @@ bool SoftSetArg(const std::string& strArg, const std::string& strValue);
 bool SoftSetBoolArg(const std::string& strArg, bool fValue);
 
 
-
-
-
-
-
-
-
-template<typename T1>
-inline uint256 Hash(const T1 pbegin, const T1 pend)
-{
-    static unsigned char pblank[1];
-    uint256 hash1;
-    SHA256((pbegin == pend ? pblank : (unsigned char*)&pbegin[0]), (pend - pbegin) * sizeof(pbegin[0]), (unsigned char*)&hash1);
-    uint256 hash2;
-    SHA256((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2);
-    return hash2;
-}
-
-class CHashWriter
-{
-private:
-    SHA256_CTX ctx;
-
-public:
-    int nType;
-    int nVersion;
-
-    void Init() {
-        SHA256_Init(&ctx);
-    }
-
-    CHashWriter(int nTypeIn, int nVersionIn) : nType(nTypeIn), nVersion(nVersionIn) {
-        Init();
-    }
-
-    CHashWriter& write(const char *pch, size_t size) {
-        SHA256_Update(&ctx, pch, size);
-        return (*this);
-    }
-
-    // invalidates the object
-    uint256 GetHash() {
-        uint256 hash1;
-        SHA256_Final((unsigned char*)&hash1, &ctx);
-        uint256 hash2;
-        SHA256((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2);
-        return hash2;
-    }
-
-    template<typename T>
-    CHashWriter& operator<<(const T& obj) {
-        // Serialize to this stream
-        ::Serialize(*this, obj, nType, nVersion);
-        return (*this);
-    }
-};
-
-
-template<typename T1, typename T2>
-inline uint256 Hash(const T1 p1begin, const T1 p1end,
-                    const T2 p2begin, const T2 p2end)
-{
-    static unsigned char pblank[1];
-    uint256 hash1;
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, (p1begin == p1end ? pblank : (unsigned char*)&p1begin[0]), (p1end - p1begin) * sizeof(p1begin[0]));
-    SHA256_Update(&ctx, (p2begin == p2end ? pblank : (unsigned char*)&p2begin[0]), (p2end - p2begin) * sizeof(p2begin[0]));
-    SHA256_Final((unsigned char*)&hash1, &ctx);
-    uint256 hash2;
-    SHA256((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2);
-    return hash2;
-}
-
-template<typename T1, typename T2, typename T3>
-inline uint256 Hash(const T1 p1begin, const T1 p1end,
-                    const T2 p2begin, const T2 p2end,
-                    const T3 p3begin, const T3 p3end)
-{
-    static unsigned char pblank[1];
-    uint256 hash1;
-    SHA256_CTX ctx;
-    SHA256_Init(&ctx);
-    SHA256_Update(&ctx, (p1begin == p1end ? pblank : (unsigned char*)&p1begin[0]), (p1end - p1begin) * sizeof(p1begin[0]));
-    SHA256_Update(&ctx, (p2begin == p2end ? pblank : (unsigned char*)&p2begin[0]), (p2end - p2begin) * sizeof(p2begin[0]));
-    SHA256_Update(&ctx, (p3begin == p3end ? pblank : (unsigned char*)&p3begin[0]), (p3end - p3begin) * sizeof(p3begin[0]));
-    SHA256_Final((unsigned char*)&hash1, &ctx);
-    uint256 hash2;
-    SHA256((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2);
-    return hash2;
-}
-
-template<typename T>
-uint256 SerializeHash(const T& obj, int nType=SER_GETHASH, int nVersion=PROTOCOL_VERSION)
-{
-    CHashWriter ss(nType, nVersion);
-    ss << obj;
-    return ss.GetHash();
-}
-
-inline uint160 Hash160(const std::vector<unsigned char>& vch)
-{
-    uint256 hash1;
-    SHA256(&vch[0], vch.size(), (unsigned char*)&hash1);
-    uint160 hash2;
-    RIPEMD160((unsigned char*)&hash1, sizeof(hash1), (unsigned char*)&hash2);
-    return hash2;
-}
-
-
 /** Median filter over a stream of values.
  * Returns the median of the last N numbers
  */
@@ -540,6 +442,7 @@ private:
     std::vector<T> vValues;
     std::vector<T> vSorted;
     unsigned int nSize;
+    T tInitial;
 public:
     CMedianFilter(unsigned int size, T initial_value):
         nSize(size)
@@ -547,6 +450,7 @@ public:
         vValues.reserve(size);
         vValues.push_back(initial_value);
         vSorted = vValues;
+        tInitial = initial_value;
     }
 
     void input(T value)
@@ -556,6 +460,27 @@ public:
             vValues.erase(vValues.begin());
         }
         vValues.push_back(value);
+
+        vSorted.resize(vValues.size());
+        std::copy(vValues.begin(), vValues.end(), vSorted.begin());
+        std::sort(vSorted.begin(), vSorted.end());
+    }
+
+    // remove last instance of a value
+    void removeLast(T value)
+    {
+        for (int i = vValues.size()-1; i >= 0; --i)
+        {
+            if (vValues[i] == value)
+            {
+                vValues.erase(vValues.begin()+i);
+                break;
+            }
+        }
+        if (vValues.empty())
+        {
+            vValues.push_back(tInitial);
+        }
 
         vSorted.resize(vValues.size());
         std::copy(vValues.begin(), vValues.end(), vSorted.begin());
@@ -626,5 +551,7 @@ inline uint32_t ByteReverse(uint32_t value)
     return (value<<16) | (value>>16);
 }
 
-#endif
+std::string CopyrightHolders(const std::string& strPrefix);
+
+#endif // MAGI_UTIL_H
 

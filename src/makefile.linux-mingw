@@ -1,4 +1,6 @@
-# Copyright (c) 2009-2010 Satoshi Nakamoto
+# Copyright (C) 2009-2012 The Bitcoin Core Developers
+# Copyright (C) 2012-2014 The PPCoin Developers
+# Copyright (C) 2014 The Magi Core Developers
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -12,13 +14,13 @@ INCLUDEPATHS= \
  -I"$(CURDIR)"/obj \
  -I"$(DEPSDIR)/boost_1_50_0" \
  -I"$(DEPSDIR)/db-4.8.30.NC/build_unix" \
- -I"$(DEPSDIR)/openssl-1.0.1c/include" \
+ -I"$(DEPSDIR)/openssl-1.0.1g/include" \
  -I"$(DEPSDIR)"
 
 LIBPATHS= \
  -L"$(DEPSDIR)/boost_1_50_0/stage/lib" \
  -L"$(DEPSDIR)/db-4.8.30.NC/build_unix" \
- -L"$(DEPSDIR)/openssl-1.0.1c"
+ -L"$(DEPSDIR)/openssl-1.0.1g"
 
 LIBS= \
  -l boost_system-mt-s \
@@ -57,7 +59,7 @@ HEADERS = $(wildcard *.h)
 
 OBJS= \
     obj/alert.o \
-    obj/version.o \
+    obj/clientversion.o \
     obj/checkpoints.o \
     obj/netbase.o \
     obj/addrman.o \
@@ -65,12 +67,11 @@ OBJS= \
     obj/key.o \
     obj/db.o \
     obj/init.o \
-    obj/irc.o \
     obj/keystore.o \
     obj/main.o \
     obj/net.o \
     obj/protocol.o \
-    obj/bitcoinrpc.o \
+    obj/magirpc.o \
     obj/rpcdump.o \
     obj/rpcnet.o \
     obj/rpcmining.o \
@@ -85,21 +86,31 @@ OBJS= \
     obj/noui.o \
     obj/kernel.o \
     obj/pbkdf2.o \
-    obj/scrypt_mine.o \
-    obj/scrypt-x86.o \
-    obj/scrypt-x86_64.o
+    obj/keccak.o \
+    obj/haval.o \
+    obj/ripemd.o \
+    obj/sha2.o \
+    obj/sha2big.o \
+    obj/tiger.o \
+    obj/whirlpool.o
 
-all: novacoind.exe
+all: magid.exe
 
 obj/build.h: FORCE
 	/bin/sh ../share/genbuild.sh obj/build.h
-version.cpp: obj/build.h
+clientversion.cpp: obj/build.h
 DEFS += -DHAVE_BUILD_INFO
 
 obj/%.o: %.cpp $(HEADERS)
 	i586-mingw32msvc-g++ -c $(CFLAGS) -o $@ $<
 
-bitcoind.exe: $(OBJS:obj/%=obj/%)
+obj/%.o: %.c $(HEADERS)
+	i586-mingw32msvc-g++ -c $(CFLAGS) -fpermissive -o $@ $<
+
+obj/%.o: hash/%.c $(HEADERS)
+	i586-mingw32msvc-g++ -c $(CFLAGS) -fpermissive -o $@ $<
+
+magid.exe: $(OBJS:obj/%=obj/%)
 	i586-mingw32msvc-g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ $(LIBS)
 
 TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
@@ -107,7 +118,10 @@ TESTOBJS := $(patsubst test/%.cpp,obj-test/%.o,$(wildcard test/*.cpp))
 obj-test/%.o: test/%.cpp $(HEADERS)
 	i586-mingw32msvc-g++ -c $(TESTDEFS) $(CFLAGS) -o $@ $<
 
-test_novacoin.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
+obj/%.o: %.c $(HEADERS)
+	$(CXX) -c $(CFLAGS) -fpermissive -o $@ $<
+
+test_magi.exe: $(TESTOBJS) $(filter-out obj/init.o,$(OBJS:obj/%=obj/%))
 	i586-mingw32msvc-g++ $(CFLAGS) $(LDFLAGS) -o $@ $(LIBPATHS) $^ -lboost_unit_test_framework-mt-s $(LIBS)
 
 obj/scrypt-x86.o: scrypt-x86.S
@@ -118,9 +132,9 @@ obj/scrypt-x86_64.o: scrypt-x86_64.S
 
 clean:
 	-rm -f obj/*.o
-	-rm -f novacoind.exe
+	-rm -f magid.exe
 	-rm -f obj-test/*.o
-	-rm -f test_novacoin.exe
+	-rm -f test_magi.exe
 	-rm -f obj/build.h
 
 FORCE:

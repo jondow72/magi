@@ -6,7 +6,7 @@
 #include "walletmodel.h"
 #include "optionsmodel.h"
 #include "addresstablemodel.h"
-#include "bitcoinunits.h"
+#include "magiunits.h"
 
 #include "wallet.h"
 #include "ui_interface.h"
@@ -300,7 +300,7 @@ QString TransactionTableModel::formatTxStatus(const TransactionRecord *wtx) cons
         switch(wtx->status.maturity)
         {
         case TransactionStatus::Immature:
-            status += "\n" + tr("Mined balance will be available when it matures in %n more block(s)", "", wtx->status.matures_in);
+            status += "\n" + tr("Generated balance will be available when it matures in %n more block(s)", "", wtx->status.matures_in);
             break;
         case TransactionStatus::Mature:
             break;
@@ -360,6 +360,7 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
     case TransactionRecord::SendToSelf:
         return tr("Payment to yourself");
     case TransactionRecord::StakeMint:
+        return tr("Generated");
     case TransactionRecord::Generated:
         return tr("Mined");
     default:
@@ -373,7 +374,11 @@ QVariant TransactionTableModel::txAddressDecoration(const TransactionRecord *wtx
     {
     case TransactionRecord::Generated:
     case TransactionRecord::StakeMint:
-        return QIcon(":/icons/tx_mined");
+		{
+			QString str = BitcoinUnits::format(walletModel->getOptionsModel()->getDisplayUnit(), wtx->credit + wtx->debit);
+			float dd = str.toFloat();
+			return QIcon(":/icons/tx_mined");
+		}
     case TransactionRecord::RecvWithAddress:
     case TransactionRecord::RecvFromOther:
         return QIcon(":/icons/tx_input");

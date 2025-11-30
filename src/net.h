@@ -18,6 +18,7 @@
 #include "netbase.h"
 #include "protocol.h"
 #include "addrman.h"
+#include "hash.h"
 
 class CRequestTracker;
 class CNode;
@@ -48,7 +49,6 @@ enum
     LOCAL_IF,     // address a local interface listens on
     LOCAL_BIND,   // address explicit bound to
     LOCAL_UPNP,   // address reported by UPnP
-    LOCAL_IRC,    // address reported by IRC (deprecated)
     LOCAL_HTTP,   // address reported by whatismyip.com and similar
     LOCAL_MANUAL, // address explicitly specified (-externalip=)
 
@@ -106,7 +106,7 @@ enum threadId
     THREAD_ADDEDCONNECTIONS,
     THREAD_DUMPADDRESS,
     THREAD_RPCHANDLER,
-    THREAD_MINTER,
+    THREAD_STAKEMINER,
 
     THREAD_MAX
 };
@@ -116,7 +116,9 @@ extern bool fDiscover;
 extern bool fUseUPnP;
 extern uint64 nLocalServices;
 extern uint64 nLocalHostNonce;
-extern CAddress addrSeenByPeer;
+extern CAddress addrSeenByPeerIp;
+extern CAddress addrSeenByPeerIpv4;
+extern CAddress addrSeenByPeerIpv6;
 extern boost::array<int, THREAD_MAX> vnThreadsRunning;
 extern CAddrMan addrman;
 

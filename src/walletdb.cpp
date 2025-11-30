@@ -73,7 +73,7 @@ void CWalletDB::ListAccountCreditDebit(const string& strAccount, list<CAccountin
     if (!pcursor)
         throw runtime_error("CWalletDB::ListAccountCreditDebit() : cannot create DB cursor");
     unsigned int fFlags = DB_SET_RANGE;
-    loop
+    while (true)
     {
         // Read next record
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
@@ -414,7 +414,7 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
             return DB_CORRUPT;
         }
 
-        loop
+        while (true)
         {
             // Read next record
             CDataStream ssKey(SER_DISK, CLIENT_VERSION);
@@ -485,7 +485,7 @@ DBErrors CWalletDB::LoadWallet(CWallet* pwallet)
 void ThreadFlushWalletDB(void* parg)
 {
     // Make this thread recognisable as the wallet flushing thread
-    RenameThread("bitcoin-wallet");
+    RenameThread("magi-wallet");
 
     const string& strFile = ((const string*)parg)[0];
     static bool fOneThread;
@@ -500,7 +500,7 @@ void ThreadFlushWalletDB(void* parg)
     int64 nLastWalletUpdate = GetTime();
     while (!fShutdown)
     {
-        Sleep(500);
+        MilliSleep(500);
 
         if (nLastSeen != nWalletDBUpdated)
         {
@@ -579,7 +579,7 @@ bool BackupWallet(const CWallet& wallet, const string& strDest)
                 }
             }
         }
-        Sleep(100);
+        MilliSleep(100);
     }
     return false;
 }

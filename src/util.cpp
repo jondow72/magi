@@ -9,6 +9,8 @@
 #include "version.h"
 #include "ui_interface.h"
 #include <boost/algorithm/string/join.hpp>
+#include <boost/algorithm/string.hpp>
+#include <boost/lexical_cast.hpp>
 
 // Work around clang compilation problem in Boost 1.46:
 // /usr/include/boost/program_options/detail/config_file.hpp:163:17: error: call to function 'to_internal' that is neither visible in the template definition nor found by argument-dependent lookup
@@ -65,6 +67,8 @@ using namespace std;
 map<string, string> mapArgs;
 map<string, vector<string> > mapMultiArgs;
 bool fDebug = false;
+bool fDebugMagi = false;
+bool fDebugMagiPoS = false;
 bool fDebugNet = false;
 bool fPrintToConsole = false;
 bool fPrintToDebugger = false;
@@ -79,6 +83,12 @@ bool fNoListen = false;
 bool fLogTimestamps = false;
 CMedianFilter<int64> vTimeOffsets(200,0);
 bool fReopenDebugLog = false;
+bool fTestNetWeightV2 = false;
+
+#ifdef QT_GUI
+const char *websiteUrl = "http://www.m-core.org/";
+const char *feedbackUrl = "http://www.m-core.org/feedback";
+#endif
 
 // Init OpenSSL library multithreading support
 static CCriticalSection** ppmutexOpenSSL;
@@ -290,7 +300,7 @@ string vstrprintf(const char *format, va_list ap)
     char* p = buffer;
     int limit = sizeof(buffer);
     int ret;
-    loop
+    while (true)
     {
         va_list arg_ptr;
         va_copy(arg_ptr, ap);
@@ -350,7 +360,7 @@ void ParseString(const string& str, char c, vector<string>& v)
         return;
     string::size_type i1 = 0;
     string::size_type i2;
-    loop
+    while (true)
     {
         i2 = str.find(c, i1);
         if (i2 == str.npos)
@@ -371,7 +381,7 @@ string FormatMoney(int64 n, bool fPlus)
     int64 n_abs = (n > 0 ? n : -n);
     int64 quotient = n_abs/COIN;
     int64 remainder = n_abs%COIN;
-    string str = strprintf("%"PRI64d".%08"PRI64d, quotient, remainder);
+    string str = strprintf("%"PRI64d".%06"PRI64d, quotient, remainder);
 
     // Right-trim excess zeros before the decimal point:
     int nTrim = 0;
@@ -452,6 +462,52 @@ static const signed char phexdigit[256] =
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,
   -1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1, };
 
+
+static const long hextable[] = 
+{
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 10-19
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 30-39
+	-1, -1, -1, -1, -1, -1, -1, -1,  0,  1,
+	 2,  3,  4,  5,  6,  7,  8,  9, -1, -1,		// 50-59
+	-1, -1, -1, -1, -1, 10, 11, 12, 13, 14,
+	15, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 70-79
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, 10, 11, 12,		// 90-99
+	13, 14, 15, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 110-109
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 130-139
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 150-159
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 170-179
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 190-199
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 210-219
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,		// 230-239
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1
+};
+
+
+long hex2long(const char* hexString)
+{
+	long ret = 0; 
+
+	while (*hexString && ret >= 0) 
+	{
+		ret = (ret << 4) | hextable[*hexString++];
+	}
+
+	return ret; 
+}
+
+
+
 bool IsHex(const string& str)
 {
     BOOST_FOREACH(unsigned char c, str)
@@ -466,7 +522,7 @@ vector<unsigned char> ParseHex(const char* psz)
 {
     // convert hex dump to vector
     vector<unsigned char> vch;
-    loop
+    while (true)
     {
         while (isspace(*psz))
             psz++;
@@ -548,6 +604,7 @@ void ParseParameters(int argc, const char* const argv[])
     }
 }
 
+//if string strArg exists in mapArgs, return the corresponding value (string), otherwise return strDefault (string)
 std::string GetArg(const std::string& strArg, const std::string& strDefault)
 {
     if (mapArgs.count(strArg))
@@ -555,6 +612,7 @@ std::string GetArg(const std::string& strArg, const std::string& strDefault)
     return strDefault;
 }
 
+//if string strArg exists in mapArgs, return the corresponding value (int64), otherwise return strDefault (string) (int64)
 int64 GetArg(const std::string& strArg, int64 nDefault)
 {
     if (mapArgs.count(strArg))
@@ -562,6 +620,9 @@ int64 GetArg(const std::string& strArg, int64 nDefault)
     return nDefault;
 }
 
+// if strArg appears in mapArgs and strArg is non-zero value, return true, 
+// if strArg appears in mapArgs and strArg is zero, return false, 
+// if strArg does not appear in mapArgs, return fDefault, 
 bool GetBoolArg(const std::string& strArg, bool fDefault)
 {
     if (mapArgs.count(strArg))
@@ -920,7 +981,7 @@ string DecodeBase32(const string& str)
 
 bool WildcardMatch(const char* psz, const char* mask)
 {
-    loop
+    while (true)
     {
         switch (*mask)
         {
@@ -960,7 +1021,7 @@ static std::string FormatException(std::exception* pex, const char* pszThread)
     char pszModule[MAX_PATH] = "";
     GetModuleFileNameA(NULL, pszModule, sizeof(pszModule));
 #else
-    const char* pszModule = "novacoin";
+    const char* pszModule = "Magi";
 #endif
     if (pex)
         return strprintf(
@@ -1009,13 +1070,13 @@ void PrintExceptionContinue(std::exception* pex, const char* pszThread)
 boost::filesystem::path GetDefaultDataDir()
 {
     namespace fs = boost::filesystem;
-    // Windows < Vista: C:\Documents and Settings\Username\Application Data\NovaCoin
-    // Windows >= Vista: C:\Users\Username\AppData\Roaming\NovaCoin
-    // Mac: ~/Library/Application Support/NovaCoin
-    // Unix: ~/.novacoin
+    // Windows < Vista: C:\Documents and Settings\Username\Application Data\Magi
+    // Windows >= Vista: C:\Users\Username\AppData\Roaming\Magi
+    // Mac: ~/Library/Application Support/Magi
+    // Unix: ~/.magi
 #ifdef WIN32
     // Windows
-    return GetSpecialFolderPath(CSIDL_APPDATA) / "NovaCoin";
+    return GetSpecialFolderPath(CSIDL_APPDATA) / "Magi";
 #else
     fs::path pathRet;
     char* pszHome = getenv("HOME");
@@ -1027,10 +1088,10 @@ boost::filesystem::path GetDefaultDataDir()
     // Mac
     pathRet /= "Library/Application Support";
     fs::create_directory(pathRet);
-    return pathRet / "NovaCoin";
+    return pathRet / "Magi";
 #else
     // Unix
-    return pathRet / ".novacoin";
+    return pathRet / ".magi";
 #endif
 #endif
 }
@@ -1072,7 +1133,7 @@ const boost::filesystem::path &GetDataDir(bool fNetSpecific)
 
 boost::filesystem::path GetConfigFile()
 {
-    boost::filesystem::path pathConfigFile(GetArg("-conf", "novacoin.conf"));
+    boost::filesystem::path pathConfigFile(GetArg("-conf", "magi.conf"));
     if (!pathConfigFile.is_complete()) pathConfigFile = GetDataDir(false) / pathConfigFile;
     return pathConfigFile;
 }
@@ -1103,7 +1164,7 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
 
 boost::filesystem::path GetPidFile()
 {
-    boost::filesystem::path pathPidFile(GetArg("-pid", "novacoind.pid"));
+    boost::filesystem::path pathPidFile(GetArg("-pid", "magid.pid"));
     if (!pathPidFile.is_complete()) pathPidFile = GetDataDir() / pathPidFile;
     return pathPidFile;
 }
@@ -1201,6 +1262,11 @@ void SetMockTime(int64 nMockTimeIn)
 
 static int64 nTimeOffset = 0;
 
+int64_t GetTimeOffset()
+{
+    return nTimeOffset;
+}
+
 int64 GetAdjustedTime()
 {
     return GetTime() + nTimeOffset;
@@ -1243,10 +1309,10 @@ void AddTimeData(const CNetAddr& ip, int64 nTime)
                 if (!fMatch)
                 {
                     fDone = true;
-                    string strMessage = _("Warning: Please check that your computer's date and time are correct! If your clock is wrong NovaCoin will not work properly.");
+                    string strMessage = _("Warning: Please check that your computer's date and time are correct! If your clock is wrong Magi will not work properly.");
                     strMiscWarning = strMessage;
                     printf("*** %s\n", strMessage.c_str());
-                    uiInterface.ThreadSafeMessageBox(strMessage+" ", string("NovaCoin"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION);
+                    uiInterface.ThreadSafeMessageBox(strMessage+" ", string("Magi"), CClientUIInterface::OK | CClientUIInterface::ICON_EXCLAMATION);
                 }
             }
         }
@@ -1257,38 +1323,6 @@ void AddTimeData(const CNetAddr& ip, int64 nTime)
         }
         printf("nTimeOffset = %+"PRI64d"  (%+"PRI64d" minutes)\n", nTimeOffset, nTimeOffset/60);
     }
-}
-
-
-
-
-
-
-
-
-string FormatVersion(int nVersion)
-{
-    if (nVersion%100 == 0)
-        return strprintf("%d.%d.%d", nVersion/1000000, (nVersion/10000)%100, (nVersion/100)%100);
-    else
-        return strprintf("%d.%d.%d.%d", nVersion/1000000, (nVersion/10000)%100, (nVersion/100)%100, nVersion%100);
-}
-
-string FormatFullVersion()
-{
-    return CLIENT_BUILD;
-}
-
-// Format the subversion field according to BIP 14 spec (https://en.bitcoin.it/wiki/BIP_0014)
-std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments)
-{
-    std::ostringstream ss;
-    ss << "/";
-    ss << name << ":" << FormatVersion(nClientVersion);
-    if (!comments.empty())
-        ss << "(" << boost::algorithm::join(comments, "; ") << ")";
-    ss << "/";
-    return ss.str();
 }
 
 #ifdef WIN32
@@ -1346,4 +1380,46 @@ bool NewThread(void(*pfn)(void*), void* parg)
         return false;
     }
     return true;
+}
+
+bool StringToDouble(const std::string &s, double &val)
+{
+    std::string str(s);
+    boost::trim(str);
+    try {
+        val = boost::lexical_cast<double>(str);
+        return true;
+    } catch (const boost::bad_lexical_cast &) {
+        return false;
+    }
+}
+
+unsigned int GetClientVersion(int nClientVersion, std::string str)
+{
+    unsigned int nVersion = nClientVersion * 10, nPos;
+    if (str.find("ALPHA") == 0) {
+        nVersion -= 10;
+        nPos = 5;
+    } else if (str.find("BETA") == 0) {
+        nVersion -= 7;
+        nPos = 4;
+    } else if (str.find("RC") == 0) {
+        nVersion -= 4;
+        nPos = 2;
+    }
+    try {
+        nVersion += boost::lexical_cast<int>(str[nPos]);
+    } catch (const boost::bad_lexical_cast &) {
+    }
+    return nVersion;
+}
+
+std::string CopyrightHolders(const std::string& strPrefix)
+{
+    std::string strCopyrightHolders = strPrefix;
+
+    if (strPrefix.find("Magi Core") == std::string::npos) {
+        strCopyrightHolders += "The Magi Core developers";
+    }
+    return strCopyrightHolders;
 }
