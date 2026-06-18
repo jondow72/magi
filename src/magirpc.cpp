@@ -523,8 +523,8 @@ bool ClientAllowed(const boost::asio::ip::address& address)
 {
     // Make sure that IPv4-compatible and IPv4-mapped IPv6 addresses are treated as IPv4 addresses
     if (address.is_v6()
-     && (address.to_v6().is_v4_compatible()
-      || address.to_v6().is_v4_mapped()))
+    && (address.is_v4() || 
+        (address.is_v6() && address.to_v6().is_v4_mapped()))
         return ClientAllowed(address.to_v6().to_v4());
 
 	std::string ipv4addr = address.to_string();
@@ -533,7 +533,7 @@ bool ClientAllowed(const boost::asio::ip::address& address)
      || address == asio::ip::address_v6::loopback()
      || (address.is_v4()
          // Check whether IPv4 addresses match 127.0.0.0/8 (loopback subnet)
-      && (address.to_v4().to_ulong() & 0xff000000) == 0x7f000000))
+      && (address.to_v4().to_bytes()[0] == 127))   // 127.x.x.x = localhost
         return true;
 
     const string strAddress = address.to_string();
@@ -577,13 +577,13 @@ public:
     bool connect(const std::string& server, const std::string& port)
     {
 #if BOOST_VERSION >= 106600
-        ip::tcp::resolver resolver(GetIOService(stream));
+        boost::asio::ip::tcp::resolver resolver(io_service);
 #else
         ip::tcp::resolver resolver(stream.get_io_service());
 #endif
-        ip::tcp::resolver::query query(server.c_str(), port.c_str());
-        ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-        ip::tcp::resolver::iterator end;
+        boost::asio::ip::tcp::resolver::query query(server, port);
+        boost::asio::ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
+        boost::asio::ip::tcp::resolver::iterator end;
         boost::system::error_code error = asio::error::host_not_found;
         while (error && endpoint_iterator != end)
         {
