@@ -3841,14 +3841,14 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
                 MIN_PROTO_VERSION = 71064;
             }
         }
-    if (pfrom->nVersion < MIN_PROTO_VERSION) 
-    {
-        // earlier versions are no longer 
-            // earlier versions are no longer supported
-            printf("partner %s using obsolete version %i; disconnecting\n", pfrom->addr.ToString().c_str(), pfrom->nVersion);
-            pfrom->fDisconnect = true;
-            return false;
-        }
+//    if (pfrom->nVersion < MIN_PROTO_VERSION) 
+//    {
+//        // earlier versions are no longer 
+//            // earlier versions are no longer supported
+//            printf("partner %s using obsolete version %i; disconnecting\n", pfrom->addr.ToString().c_str(), pfrom->nVersion);
+//            pfrom->fDisconnect = true;
+//            return false;
+//        }
 
         if (pfrom->nVersion == 10300)
             pfrom->nVersion = 300;
