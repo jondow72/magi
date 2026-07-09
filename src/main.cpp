@@ -3826,6 +3826,10 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv)
         CAddress addrFrom;
         uint64 nNonce = 1;
         vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
+        if (pfrom->nVersion == 209)
+        {
+            pfrom->nVersion = 71064; // Geef hem intern de hoogste Magi-status
+        }
         if (pfrom->nVersion < MIN_PROTO_VERSION) 
         {
             // earlier versions are no longer supported
