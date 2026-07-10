@@ -626,7 +626,7 @@ public:
         ip::tcp::resolver::results_type endpoints = resolver.resolve(server.c_str(), port.c_str());
         ip::tcp::resolver::results_type::iterator endpoint_iterator = endpoints.begin();
         ip::tcp::resolver::results_type::iterator end = endpoints.end();
-        boost::system::error_code error = asio::error::host_not_found;
+        boost::system::error_code error = boost::asio::error::host_not_found;
         while (error && endpoint_iterator != end)
         {
             stream.lowest_layer().close();
