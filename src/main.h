@@ -28,9 +28,9 @@ class CNode;
 
 static const int MAX_MAGI_POW_HEIGHT = 25000000;
 static const int PRM_MAGI_POW_HEIGHT = 80000;
-static const int PRM_MAGI_POW_HEIGHT_V2 = 50000; // re-cal PoW-I end block
+static const int PRM_MAGI_POW_HEIGHT_V2 = 50000; // re-cal PoW-I end block time 1415349067
 static const int END_MAGI_POW_HEIGHT = 500000;
-static const int END_MAGI_POW_HEIGHT_V2 = 5000000; // PoW-II aims to issue 12 mil and more than 10 years
+static const int END_MAGI_POW_HEIGHT_V2 = 5000000; // PoW-II aims to issue 12 mil and more than 10 years time 1764975810
 
 static const int BLOCK_REWARD_ADJT = 2700;
 static const int BLOCK_REWARD_ADJT_M7M_V2 = 32750;
@@ -75,9 +75,9 @@ inline bool IsMiningProofOfStake(int nHeight )
 
 //#define FORK_BLOCK_REWARDS_V2_TESNT 1419402600
 #define FORK_BLOCK_REWARDS_V2_TESNT 0
-#define FORK_BLOCK_REWARDS_V2 1420650000
-#define HEIGHT_CHAIN_SWITCH 1606950
-#define HEIGHT_PROTOCOL_V3 1825100
+#define FORK_BLOCK_REWARDS_V2 1420650000 //Height:	132604
+#define HEIGHT_CHAIN_SWITCH 1606950 // time 1515214991
+#define HEIGHT_PROTOCOL_V3 1825100 // time 1526519842
 
 inline bool IsPoWIIRewardProtocolV2(unsigned int nTime0)
 {
@@ -94,7 +94,7 @@ inline bool IsPoSIIProtocolV2(int nHeight)
     	if (nHeight > 40860) fTestNetWeightV2 = true;
 	   else fTestNetWeightV2 = false;
 	   return nHeight > 40780;
-    } else return (nHeight > 131300);
+    } else return (nHeight > 131300); // time 1420567176
 }
 
 inline bool IsProtocolV3(int nHeight)
@@ -103,7 +103,7 @@ inline bool IsProtocolV3(int nHeight)
     return (nHeight > HEIGHT_PROTOCOL_V3);
 }
 
-inline bool IsBlockVersion5(int nHeight) { return fTestNet || nHeight > 1446791; }
+inline bool IsBlockVersion5(int nHeight) { return fTestNet || nHeight > 1446791; } // time 1502896469
 inline unsigned int GetStakeMinAge(unsigned int nTime0) { return ( (nTime0 > 1503248400) ? (60 * 60 * 8) : (60 * 60 * 2) ); }
 
 inline int64 GetMaxPoWWaitingTime()
