@@ -658,8 +658,8 @@ class AcceptedConnectionImpl : public AcceptedConnection
 {
 public:
     AcceptedConnectionImpl(
-            asio::io_service& io_service,
-            ssl::context &context,
+            boost::asio::io_context& io_service,
+            boost::asio::ssl::context& context,
             bool fUseSSL) :
         sslStream(io_service, context),
         _d(sslStream, fUseSSL),
