@@ -851,7 +851,7 @@ void ThreadRPCServer2(void* parg)
 
     const bool fUseSSL = GetBoolArg("-rpcssl");
 
-    asio::io_service io_service;
+    boost::asio::io_context io_service;
 
 #if BOOST_VERSION >= 106600
     ssl::context context(ssl::context::sslv23);
