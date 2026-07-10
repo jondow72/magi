@@ -571,8 +571,8 @@ bool ClientAllowed(const boost::asio::ip::address& address)
 
 	std::string ipv4addr = address.to_string();
 
-    if (address == asio::ip::address_v4::loopback()
-     || address == asio::ip::address_v6::loopback()
+    if (address == boost::asio::ip::address_v4::loopback()
+     || address == boost::asio::ip::address_v6::loopback()
      || (address.is_v4()
          // Check whether IPv4 addresses match 127.0.0.0/8 (loopback subnet)
       && (address.to_v4().to_uint() & 0xff000000) == 0x7f000000))
