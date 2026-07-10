@@ -27,6 +27,47 @@
 #include <boost/bind/placeholders.hpp>
 #include <list>
 
+#include <boost/bind/placeholders.hpp> // Dit was jouw laatste regel
+
+// --- COMPATIBILITEIT MET MODERNE BOOST (POST-2018) ---
+namespace boost { 
+    namespace asio {
+        // Zorgt dat io_service verwijst naar de nieuwe io_context
+        typedef io_context io_service; 
+        
+        namespace socket_base {
+            // Herstelt de oude max_connections constante
+            constexpr int max_connections = max_listen_connections;
+        }
+        
+        namespace ip {
+            namespace tcp {
+                // Bouwt de oude resolver::query functionaliteit na
+                class resolver {
+                public:
+                    typedef boost::asio::ip::tcp::resolver_base::flags query_basename;
+                    class query {
+                    public:
+                        query(const char* host, const char* service) : h(host), s(service) {}
+                        std::string h, s;
+                    };
+                    typedef boost::asio::ip::tcp::resolver::results_type results_type;
+                    typedef results_type::iterator iterator;
+                };
+            }
+        }
+    }
+}
+
+// Zorgt dat resolver.resolve(query) correct wordt omgezet naar de nieuwe syntax
+inline boost::asio::ip::tcp::resolver::results_type resolve(boost::asio::ip::tcp::resolver& r, const boost::asio::ip::tcp::resolver::query& q) {
+    return r.resolve(q.h, q.s);
+}
+#define resolve(q) resolve(resolver, q)
+// -----------------------------------------------------
+
+
+
 #define printf OutputDebugStringF
 
 using namespace std;
@@ -522,10 +563,11 @@ void ErrorReply(std::ostream& stream, const Object& objError, const Value& id)
 bool ClientAllowed(const boost::asio::ip::address& address)
 {
     // Make sure that IPv4-compatible and IPv4-mapped IPv6 addresses are treated as IPv4 addresses
-    if (address.is_v6()
-     && (address.to_v6().is_v4_compatible()
-      || address.to_v6().is_v4_mapped()))
-        return ClientAllowed(address.to_v6().to_v4());
+    if (address.is_v6()) {
+        if (address.to_v6().is_v4_mapped()) {
+            return ClientAllowed(address.to_v6().to_v4());
+        }
+    }
 
 	std::string ipv4addr = address.to_string();
 
@@ -533,7 +575,7 @@ bool ClientAllowed(const boost::asio::ip::address& address)
      || address == asio::ip::address_v6::loopback()
      || (address.is_v4()
          // Check whether IPv4 addresses match 127.0.0.0/8 (loopback subnet)
-      && (address.to_v4().to_ulong() & 0xff000000) == 0x7f000000))
+      && (address.to_v4().to_uint() & 0xff000000) == 0x7f000000))
         return true;
 
     const string strAddress = address.to_string();
@@ -581,9 +623,9 @@ public:
 #else
         ip::tcp::resolver resolver(stream.get_io_service());
 #endif
-        ip::tcp::resolver::query query(server.c_str(), port.c_str());
-        ip::tcp::resolver::iterator endpoint_iterator = resolver.resolve(query);
-        ip::tcp::resolver::iterator end;
+        ip::tcp::resolver::results_type endpoints = resolver.resolve(server.c_str(), port.c_str());
+        ip::tcp::resolver::results_type::iterator endpoint_iterator = endpoints.begin();
+        ip::tcp::resolver::results_type::iterator end = endpoints.end();
         boost::system::error_code error = asio::error::host_not_found;
         while (error && endpoint_iterator != end)
         {
@@ -821,12 +863,12 @@ void ThreadRPCServer2(void* parg)
         context.set_options(ssl::context::no_sslv2);
 
         boost::filesystem::path pathCertFile(GetArg("-rpcsslcertificatechainfile", "server.cert"));
-        if (!pathCertFile.is_complete()) pathCertFile = boost::filesystem::path(GetDataDir()) / pathCertFile;
+        if (!pathCertFile.is_absolute()) pathCertFile = boost::filesystem::path(GetDataDir()) / pathCertFile;
         if (boost::filesystem::exists(pathCertFile)) context.use_certificate_chain_file(pathCertFile.string());
         else printf("ThreadRPCServer ERROR: missing server certificate file %s\n", pathCertFile.string().c_str());
 
         boost::filesystem::path pathPKFile(GetArg("-rpcsslprivatekeyfile", "server.pem"));
-        if (!pathPKFile.is_complete()) pathPKFile = boost::filesystem::path(GetDataDir()) / pathPKFile;
+        if (!pathPKFile.is_absolute()) pathPKFile = boost::filesystem::path(GetDataDir()) / pathPKFile;
         if (boost::filesystem::exists(pathPKFile)) context.use_private_key_file(pathPKFile.string(), ssl::context::pem);
         else printf("ThreadRPCServer ERROR: missing server private key file %s\n", pathPKFile.string().c_str());
 
