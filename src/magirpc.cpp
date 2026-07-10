@@ -27,47 +27,6 @@
 #include <boost/bind/placeholders.hpp>
 #include <list>
 
-#include <boost/bind/placeholders.hpp> // Dit was jouw laatste regel
-
-// --- COMPATIBILITEIT MET MODERNE BOOST (POST-2018) ---
-namespace boost { 
-    namespace asio {
-        // Zorgt dat io_service verwijst naar de nieuwe io_context
-        typedef io_context io_service; 
-        
-        namespace socket_base {
-            // Herstelt de oude max_connections constante
-            constexpr int max_connections = max_listen_connections;
-        }
-        
-        namespace ip {
-            namespace tcp {
-                // Bouwt de oude resolver::query functionaliteit na
-                class resolver {
-                public:
-                    typedef boost::asio::ip::tcp::resolver_base::flags query_basename;
-                    class query {
-                    public:
-                        query(const char* host, const char* service) : h(host), s(service) {}
-                        std::string h, s;
-                    };
-                    typedef boost::asio::ip::tcp::resolver::results_type results_type;
-                    typedef results_type::iterator iterator;
-                };
-            }
-        }
-    }
-}
-
-// Zorgt dat resolver.resolve(query) correct wordt omgezet naar de nieuwe syntax
-inline boost::asio::ip::tcp::resolver::results_type resolve(boost::asio::ip::tcp::resolver& r, const boost::asio::ip::tcp::resolver::query& q) {
-    return r.resolve(q.h, q.s);
-}
-#define resolve(q) resolve(resolver, q)
-// -----------------------------------------------------
-
-
-
 #define printf OutputDebugStringF
 
 using namespace std;
