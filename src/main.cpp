@@ -5135,7 +5135,7 @@ CBlock* CreateNewBlock(CWallet* pwallet, bool fProofOfStake)
     if (pblock->IsProofOfWork())
 	{
             pblock->UpdateTime(pindexPrev);
-	    pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pindexPrev->nBits, pindex->pprev->nTime, nFees);
+	    pblock->vtx[0].vout[0].nValue = GetProofOfWorkReward(pindexPrev->nBits, pindexPrev->nTime, nFees);
 	}
         pblock->nNonce         = 0;
     }
