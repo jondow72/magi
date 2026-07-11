@@ -1186,7 +1186,7 @@ int64 GetProofOfWorkReward(int nBits, unsigned int nTime, int64 nFees)
         }
         else if (nTime <= PRM_MAGI_POW_TIME_V2) {
             // Vroege curves (BLOCK_REWARD_ADJT) caps
-            nSubsidy = 294.118 * COIN; 
+            nSubsidy = 302 * COIN; 
         } 
         else {
             // PoW-I/II overgangsperiode cap
