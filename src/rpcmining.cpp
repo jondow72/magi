@@ -74,7 +74,7 @@ Value getmininginfo(const Array& params, bool fHelp)
     uint64 nEstimateTime = 90 * GetPoSKernelPS() / nWeight;
     double bvalue = (IsPoWIIRewardProtocolV2(pindexBest->nTime)) ? 
 		  ((double)GetProofOfWorkRewardV2(pindexBest, 0, true))/((double)COIN) : 
-		  (double)((uint64_t)(GetProofOfWorkReward(pindexBest->nBits, pindexBest->nHeight, 0)/COIN));
+		  (double)((uint64_t)(GetProofOfWorkReward(pindexBest->nBits, pindexBest->nTime, 0)/COIN));
     double rAPR = (IsPoSIIProtocolV2(pindexBest->nHeight+1)) ? 
 		  GetAnnualInterestV2(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE, pindexBest) : 
 		  GetAnnualInterest(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE);
