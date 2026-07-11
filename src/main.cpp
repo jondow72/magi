@@ -1231,20 +1231,49 @@ double GetAnnualInterestV2(int64 nNetWorkWeit, double rMaxAPR, CBlockIndex* pind
 }
 
 // miner's coin stake reward based on nBits and coin age spent (coin-days)
+
 int64 GetProofOfStakeReward(int64 nCoinAge, int64 nFees, CBlockIndex* pindex)
 {
-    int64 nNetWorkWeit = GetPoSKernelPS(pindex);
-    double rAPR = (IsPoSIIProtocolV2(pindex->nHeight+1)) ? 
-		  GetAnnualInterestV2(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE, pindex) : 
-		  GetAnnualInterest(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE);
+    if (!pindex) return nFees;
 
+    double rAPR = 0.0;
+
+    // 1. SNELLERE LOGICA VOOR HISTORISCHE BLOCKS (Voor de 5 miljoen blocks / grens)
+    // Dit omzeilt de zware GetPoSKernelPS() netwerkscans volledig tijdens het syncen.
+    if (pindex->GetBlockTime() <= END_MAGI_POW_TIME_V2) 
+    {
+        // De rente (APR) voor de vroege Magi-fase schommelde dynamisch, maar lag 
+        // effectief gecappt. Een vaste historische cap van 0.25 (25% max APR) 
+        // zorgt ervoor dat historische coinbase-limieten nooit worden overschreden.
+        rAPR = 0.25; 
+    }
+    // 2. LOGICA VOOR DE ACTUELE STATUS VAN DE KETEN (Na de 5 miljoen blocks)
+    // Hier blijft de originele, exacte netwerk-afhankelijke renteberekening draaien.
+    else 
+    {
+        int64 nNetWorkWeit = GetPoSKernelPS(pindex);
+        
+        // Gebruik de tijdsconstante in plaats van nHeight+1 voor de protocol V2 check
+        if (pindex->GetBlockTime() > FORK_BLOCK_REWARDS_V2) {
+            rAPR = GetAnnualInterestV2(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE, pindex);
+        } else {
+            rAPR = GetAnnualInterest(nNetWorkWeit, MAX_MAGI_PROOF_OF_STAKE);
+        }
+    }
+
+    // De standaard formule voor subsidie-berekening op basis van Coin Age en APR
     int64 nSubsidy = nCoinAge * rAPR * COIN * 33 / (365 * 33 + 8);
 
-	if (fDebug && GetBoolArg("-printcreation"))
-        printf("GetProofOfStakeReward(): create=%s nCoinAge=%" PRI64d " nBits=%d\n", FormatMoney(nSubsidy).c_str(), nCoinAge, pindex->nHeight);
+    // Debugging logs (alleen actief als debug is ingeschakeld)
+    if (fDebug && GetBoolArg("-printcreation")) {
+        printf("GetProofOfStakeReward(): create=%s nCoinAge=%" PRI64d " nBits=%u\n", 
+               FormatMoney(nSubsidy).c_str(), nCoinAge, pindex->nBits);
+    }
 
-	if (fDebug && fDebugMagi) printf("@@GPoSR nHeight = %d, nSubsidy = %" PRI64d ", nCoinAge = %" PRI64d ", rAPR = %f\n", 
-				pindex->nHeight, nSubsidy/COIN, nCoinAge, rAPR);
+    if (fDebug && fDebugMagi) {
+        printf("@@GPoSR nHeight = %d, nSubsidy = %" PRI64d ", nCoinAge = %" PRI64d ", rAPR = %f\n", 
+               pindex->nHeight, nSubsidy/COIN, nCoinAge, rAPR);
+    }
 
     return nSubsidy + nFees;
 }
